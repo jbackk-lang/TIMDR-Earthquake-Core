@@ -8,10 +8,12 @@ wstrząsu (fronts) i klasyczny picker STA/LTA (`sta_lta` /
 
 ## Status
 
-Kod ze zgłoszenia uruchomiony i przetestowany (`test_timdr_core_earthquake.py`,
-30/30 testów). Potwierdzone: nie crashuje na n=0/1/2 (zgodnie z opisem
-zgłoszenia). Znalezione i naprawione: 2 błędy, oba realnie wpływające na
-dokładność detekcji na prawdziwych danych sejsmicznych.
+Kod ze zgłoszenia uruchomiony i przetestowany (41/41 testów łącznie:
+`test_timdr_core_earthquake.py` + `test_catalog_core.py`). Potwierdzone:
+nie crashuje na n=0/1/2 (zgodnie z opisem zgłoszenia). Znalezione i
+naprawione łącznie 3 błędy (2 w rdzeniu waveform, 1 w nowym trybie
+katalogowym), wszystkie realnie wpływające na dokładność detekcji na
+prawdziwych danych sejsmicznych.
 
 ## 🆕 STA/LTA — klasyczny picker, zweryfikowany zgodnie z ObsPy
 
@@ -121,6 +123,62 @@ zera).
   sięgać w przyszłość względem próbki), więc do detekcji w czasie
   rzeczywistym nadaje się z niewielkim opóźnieniem, nie "na bieżąco" bez
   żadnego lagu.
+
+## 🆕 Tryb katalogowy — `catalog_core.py`, zweryfikowany na żywych danych USGS
+
+Powyższy `timdr_core_earthquake.py` jest zbudowany pod **falę** (ciągła
+amplituda z sejsmometru). Katalog zdarzeń (lista trzęsień: czas +
+magnitude, jak z `earthquake.usgs.gov/fdsnws/event`) to inny typ danych
+— rzadki, nieregularny proces punktowy. `catalog_core.py` to osobna,
+mała implementacja tej samej rodziny detektorów (anomaly / trend /
+rhythm) przystosowana do listy zdarzeń, tego samego typu co
+`TIMDRIndustrialFusion` z TIMDR-Industrial-Predict (kod zduplikowany
+celowo — dwa niezależne repo, bez wzajemnych importów).
+
+Zweryfikowano na **żywych danych USGS**, pobranych 2026-08-14 (M5.0+,
+2026-08-01 do 2026-08-14, 64 zdarzenia, w tym mainshock M7.4 w
+Kolumbii) — patrz `demo_usgs_catalog.py`:
+
+- **Anomalie**: poprawnie wskazuje 5 największych zdarzeń (M5.7, dwa
+  M6.3, M6.0, M7.4) jako anomalie, z mainshockiem na szczycie
+  (z=14.84).
+- **Aftershock**: pierwsze zdarzenie po mainshocku M7.4 to M5.0, 43.7
+  minuty później — niezależnie od TIMDR, to zgodny z realną
+  sejsmologią wzorzec główny wstrząs → aftershock, znaleziony wprost w
+  danych.
+- **Rytm — błąd znaleziony i naprawiony po drodze**: pierwsza wersja
+  tego demo liczyła `rhythm()` na `E=|MAD-z(magnitude)|`, kopiując 1:1
+  wzorzec z wielocechowego `fuse()` z TIMDR-Industrial-Predict. Dla
+  **pojedynczej** cechy branie wartości bezwzględnej z MAD-z tworzy
+  sztuczną okresowość z rektyfikacji (ten sam mechanizm co
+  udokumentowany błąd L2-norm w TIMDR-Industrial-Fusion) — dawało to
+  graniczny fałszywy alarm: `score=0.434`, tuż nad progiem 0.4, na
+  danych, które nie mają żadnej prawdziwej okresowości (globalna
+  sejsmiczność M5+ jest w przybliżeniu procesem Poissona). Naprawiono:
+  `rhythm()` w `catalog_core.py` liczy autokorelację bezpośrednio na
+  wartości ze znakiem, nie na rektyfikowanej. Po poprawce ten sam
+  katalog poprawnie daje `[]`, `0.0` — brak wykrytej okresowości.
+
+**Nadal aktualne ograniczenie** (udokumentowane w docstringu, nie
+błąd): lag w `rhythm()` liczony jest po indeksie zdarzenia w katalogu,
+nie po realnym czasie — "okres=N" znaczy "co N zdarzeń", nie "co N
+godzin". Dla katalogu o bardzo nierównomiernych odstępach to może dać
+matematycznie poprawny, ale mylnie nazwany wynik. Do prawdziwej
+periodyczności względem czasu (cykle pływowe, sezonowe wyzwalanie)
+lepszy byłby Lomb-Scargle.
+
+```python
+from catalog_core import TIMDRCatalogFusion
+
+cat = TIMDRCatalogFusion()
+idx, z = cat.anomalies(magnitude)                 # najwieksze/najmniejsze zdarzenia
+slopes, tz = cat.trend(t, magnitude, window=15)    # narastajaca/malejaca aktywnosc
+periods, score = cat.rhythm(magnitude)             # UWAGA: lag w zdarzeniach, nie w czasie
+next_idx, dt = cat.nearest_aftershock(t, magnitude)
+```
+
+Uruchomienie: `python demo_usgs_catalog.py` (instrukcja odświeżenia
+danych live na aktualny katalog USGS w nagłówku pliku).
 
 ## Przykład użycia
 
