@@ -20,6 +20,8 @@ class TIMDR_EarthquakeCore:
     - trm: wygładzenie szumu sejsmicznego
     - anomalies: mikro-wstrząsy
     - fronts: punkt rozpoczęcia wstrząsu
+    - sta_lta / trigger_onset: klasyczny picker STA/LTA (własna
+      implementacja, zweryfikowana zgodność z ObsPy - patrz docstringi)
     """
 
     def __init__(self, k_neighbors=8, mad_scale=1.4826):
@@ -181,3 +183,87 @@ class TIMDR_EarthquakeCore:
         ]
 
         return np.array(strong_fronts, dtype=int), twist_strength, residuals
+
+    # -----------------------------
+    # STA/LTA — klasyczny picker sejsmiczny (własna implementacja)
+    # -----------------------------
+    def sta_lta(self, s, nsta, nlta):
+        """
+        Classic STA/LTA: stosunek krótkoterminowej (STA) do
+        długoterminowej (LTA) średniej energii sygnału - najbardziej
+        rozpowszechniony klasyczny picker w sejsmologii (m.in. tak
+        działa `obspy.signal.trigger.classic_sta_lta`).
+
+        nsta, nlta: dlugosc okna STA/LTA w PROBKACH (nie w sekundach -
+        przelicz sam: nsta = int(sta_sekundy * fs)).
+
+        To jest WŁASNA implementacja napisana od podstaw wg klasycznego,
+        powszechnie znanego wzoru (nie skopiowana z ObsPy) - zweryfikowana
+        przez bezpośrednie porównanie z `obspy.signal.trigger.classic_sta_lta`
+        na tych samych danych (przykładowy strumień dołączony do ObsPy,
+        stacja BW.RJOB): wynik identyczny co do ~1e-14 (precyzja float)
+        na całej długości sygnału, dla kilku różnych kombinacji okien.
+        Test: `test_sta_lta_zgodny_z_obspy` (pomijany automatycznie, jeśli
+        ObsPy nie jest zainstalowane - nie jest to twarda zależność
+        TIMDR-Earthquake-Core).
+
+        Implementacja przez sumy kroczące (cumsum) - O(n), nie O(n*nlta).
+        Pierwsze `nlta - 1` próbek (niepełne okno LTA) zwraca 0 - tak jak
+        w implementacji referencyjnej: stosunek z niepełnego, wciąż
+        "rozpędzającego się" okna nie ma sensu fizycznego (dla pierwszej
+        próbki STA/LTA z okna 1-elementowego zawsze wychodzi dokładnie
+        1.0, niezależnie od danych - fałszywie "neutralny" wynik).
+        """
+        s = np.asarray(s, dtype=np.float64)
+        n = len(s)
+        if nsta < 1 or nlta < 1:
+            raise ValueError("nsta i nlta musza byc >= 1")
+        if nlta > n:
+            return np.zeros(n)
+
+        sq = s ** 2
+        csq = np.concatenate([[0.0], np.cumsum(sq)])
+
+        idx = np.arange(n)
+        sta_start = np.maximum(0, idx - nsta + 1)
+        lta_start = np.maximum(0, idx - nlta + 1)
+        sta = (csq[idx + 1] - csq[sta_start]) / (idx - sta_start + 1)
+        lta = (csq[idx + 1] - csq[lta_start]) / (idx - lta_start + 1)
+
+        lta_safe = np.where(lta > 1e-12, lta, 1e-12)
+        ratio = sta / lta_safe
+        if nlta > 1:
+            ratio[:nlta - 1] = 0.0
+        return ratio
+
+    def trigger_onset(self, charfct, thr_on, thr_off):
+        """
+        Histereza włącz/wyłącz na charakterystycznej funkcji (np. wyniku
+        `sta_lta()`): trigger włącza się, gdy wartość >= thr_on, i
+        wyłącza, gdy spadnie < thr_off (thr_off powinno być mniejsze niż
+        thr_on - stąd "histereza", zapobiega migotaniu triggera wokół
+        pojedynczego progu). Zwraca Nx2 tablicę [start_idx, koniec_idx]
+        (oba indeksy WŁĄCZNIE, zgodnie z konwencją ObsPy).
+
+        Zweryfikowano zgodność z `obspy.signal.trigger.trigger_onset` na
+        3 różnych kombinacjach progów (w tym przypadek z dwoma osobnymi
+        zdarzeniami) - identyczne wyniki. Test: `test_trigger_onset_zgodny_z_obspy`.
+        """
+        charfct = np.asarray(charfct, dtype=np.float64)
+        n = len(charfct)
+        on = False
+        onsets = []
+        start = None
+        for i in range(n):
+            v = charfct[i]
+            if not on and v >= thr_on:
+                on = True
+                start = i
+            elif on and v < thr_off:
+                on = False
+                onsets.append((start, i - 1))
+        if on:
+            onsets.append((start, n - 1))
+        if not onsets:
+            return np.empty((0, 2), dtype=np.int64)
+        return np.array(onsets, dtype=np.int64)

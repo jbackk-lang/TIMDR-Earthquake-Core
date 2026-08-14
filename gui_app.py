@@ -82,7 +82,7 @@ class TimdrEarthquakeGUI(tk.Tk):
         header = ttk.Frame(self)
         header.pack(fill="x", padx=16, pady=(14, 6))
         ttk.Label(header, text="🌍 TIMDR-Earthquake-Core", style="Header.TLabel").pack(side="left")
-        ttk.Label(header, text="  flow · twist · TRM · anomalie · fronty",
+        ttk.Label(header, text="  flow · twist · TRM · anomalie · fronty · STA/LTA",
                   foreground="#607d8b").pack(side="left", padx=(4, 0))
 
         body = ttk.Frame(self)
@@ -151,6 +151,23 @@ class TimdrEarthquakeGUI(tk.Tk):
         self._param_row(param_frame, "próg twist:", self.twist_thr_var)
         self._param_row(param_frame, "factor anomalii:", self.anomaly_factor_var)
 
+        stalta_frame = ttk.Labelframe(parent, text="4. STA/LTA (picker)", padding=10)
+        stalta_frame.pack(fill="x", pady=(0, 10))
+
+        # Domyslne 25/100 probek = 0.25s/1.0s przy 100Hz (jak w demo.py,
+        # zweryfikowane wobec ObsPy - patrz README). Progi 3.0/1.0 to
+        # standardowe wartosci startowe dla classic STA/LTA - wymagaja
+        # przestrojenia pod realny szum tla i czulosc sensora.
+        self.nsta_var = tk.StringVar(value="25")
+        self.nlta_var = tk.StringVar(value="100")
+        self.thr_on_var = tk.StringVar(value="3.0")
+        self.thr_off_var = tk.StringVar(value="1.0")
+
+        self._param_row(stalta_frame, "nsta (próbki):", self.nsta_var)
+        self._param_row(stalta_frame, "nlta (próbki):", self.nlta_var)
+        self._param_row(stalta_frame, "próg włącz:", self.thr_on_var)
+        self._param_row(stalta_frame, "próg wyłącz:", self.thr_off_var)
+
         ttk.Button(parent, text="▶  Uruchom analizę", style="Accent.TButton",
                    command=self.on_analyze).pack(fill="x", pady=(4, 10))
 
@@ -173,9 +190,9 @@ class TimdrEarthquakeGUI(tk.Tk):
         plot_frame = ttk.Frame(parent)
         plot_frame.pack(fill="both", expand=True)
 
-        self.fig = Figure(figsize=(7.5, 7), dpi=100)
-        self.axes = self.fig.subplots(4, 1, sharex=True)
-        self.fig.subplots_adjust(hspace=0.35, left=0.09, right=0.98, top=0.96, bottom=0.07)
+        self.fig = Figure(figsize=(7.5, 8.5), dpi=100)
+        self.axes = self.fig.subplots(5, 1, sharex=True)
+        self.fig.subplots_adjust(hspace=0.4, left=0.09, right=0.98, top=0.96, bottom=0.06)
         self._draw_placeholder()
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
@@ -184,7 +201,8 @@ class TimdrEarthquakeGUI(tk.Tk):
         toolbar.update()
 
     def _draw_placeholder(self):
-        titles = ["Sygnał", "flow (lokalny gradient)", "|twist|", "residuum + anomalie/fronty"]
+        titles = ["Sygnał", "flow (lokalny gradient)", "|twist|", "residuum + anomalie/fronty",
+                  "STA/LTA ratio"]
         for ax, title in zip(self.axes, titles):
             ax.clear()
             ax.set_ylabel(title, fontsize=9)
@@ -226,8 +244,15 @@ class TimdrEarthquakeGUI(tk.Tk):
             k = int(self.k_var.get())
             twist_thr = float(self.twist_thr_var.get())
             anomaly_factor = float(self.anomaly_factor_var.get())
+            nsta = int(self.nsta_var.get())
+            nlta = int(self.nlta_var.get())
+            thr_on = float(self.thr_on_var.get())
+            thr_off = float(self.thr_off_var.get())
         except ValueError:
-            messagebox.showerror("Błędne parametry", "k_neighbors, próg twist i factor anomalii musza byc liczbami.")
+            messagebox.showerror(
+                "Błędne parametry",
+                "k_neighbors, próg twist, factor anomalii, nsta, nlta, próg włącz i próg wyłącz musza byc liczbami."
+            )
             return
 
         try:
@@ -244,17 +269,22 @@ class TimdrEarthquakeGUI(tk.Tk):
             twist_pts, twist_strength = core.twist(flow_grad, t, threshold=twist_thr)
             anomaly_pts, residuals, th = core.anomalies(t, s, factor=anomaly_factor)
             fronts, _, _ = core.fronts(t, s, twist_threshold=twist_thr, anomaly_factor=anomaly_factor)
+            ratio = core.sta_lta(s, nsta, nlta)
+            onsets = core.trigger_onset(ratio, thr_on=thr_on, thr_off=thr_off)
 
-            self._plot_results(t, s, flow_grad, twist_strength, twist_pts, residuals, anomaly_pts, fronts, twist_thr)
-            self._show_results(t, twist_pts, anomaly_pts, fronts, th)
+            self._plot_results(t, s, flow_grad, twist_strength, twist_pts, residuals, anomaly_pts, fronts,
+                                twist_thr, ratio, onsets, thr_on, thr_off)
+            self._show_results(t, twist_pts, anomaly_pts, fronts, th, ratio, onsets)
             self.status_var.set(
-                f"Analiza zakończona: {len(twist_pts)} pkt. twist, {len(anomaly_pts)} anomalii, {len(fronts)} frontów."
+                f"Analiza zakończona: {len(twist_pts)} pkt. twist, {len(anomaly_pts)} anomalii, "
+                f"{len(fronts)} frontów, {len(onsets)} wyzwoleń STA/LTA."
             )
         except Exception:
             messagebox.showerror("Błąd analizy", traceback.format_exc(limit=3))
 
     # ------------------------------------------------------------
-    def _plot_results(self, t, s, flow_grad, twist_strength, twist_pts, residuals, anomaly_pts, fronts, twist_thr):
+    def _plot_results(self, t, s, flow_grad, twist_strength, twist_pts, residuals, anomaly_pts, fronts,
+                       twist_thr, ratio, onsets, thr_on, thr_off):
         for ax in self.axes:
             ax.clear()
             ax.grid(alpha=0.2)
@@ -283,12 +313,21 @@ class TimdrEarthquakeGUI(tk.Tk):
         if len(anomaly_pts) or len(fronts):
             self.axes[3].legend(fontsize=7, loc="upper right")
         self.axes[3].set_ylabel("residuum", fontsize=9)
-        self.axes[3].set_xlabel("czas (s)")
+
+        self.axes[4].plot(t, ratio, color="#00838f", lw=0.9)
+        self.axes[4].axhline(thr_on, color=self.COLORS["danger"], ls="--", lw=1, label="próg włącz")
+        self.axes[4].axhline(thr_off, color=self.COLORS["warn"], ls="--", lw=1, label="próg wyłącz")
+        for k_evt, (i_start, i_end) in enumerate(onsets):
+            self.axes[4].axvspan(t[i_start], t[i_end], color=self.COLORS["danger"], alpha=0.15,
+                                  label="wyzwolenie" if k_evt == 0 else None)
+        self.axes[4].legend(fontsize=7, loc="upper right")
+        self.axes[4].set_ylabel("STA/LTA", fontsize=9)
+        self.axes[4].set_xlabel("czas (s)")
 
         self.fig.suptitle("")
         self.canvas.draw()
 
-    def _show_results(self, t, twist_pts, anomaly_pts, fronts, threshold):
+    def _show_results(self, t, twist_pts, anomaly_pts, fronts, threshold, ratio, onsets):
         lines = []
         lines.append(f"Liczba próbek: {len(t)}")
         lines.append(f"Zakres czasu: {t[0]:.3f} - {t[-1]:.3f} s")
@@ -305,6 +344,17 @@ class TimdrEarthquakeGUI(tk.Tk):
                 lines.append(f"  ostatni front:  t={t[fronts[-1]]:.3f}s (idx={fronts[-1]})")
         else:
             lines.append("  (brak wykrytych frontów)")
+
+        lines.append("")
+        lines.append(f"Wyzwolenia STA/LTA: {len(onsets)}")
+        if len(onsets):
+            i_start, i_end = onsets[0]
+            lines.append(f"  pierwsze: t={t[i_start]:.3f}s -> {t[i_end]:.3f}s (idx={i_start}-{i_end})")
+            if len(onsets) > 1:
+                i_start, i_end = onsets[-1]
+                lines.append(f"  ostatnie: t={t[i_start]:.3f}s -> {t[i_end]:.3f}s (idx={i_start}-{i_end})")
+        else:
+            lines.append("  (brak wyzwoleń - sprawdź progi włącz/wyłącz albo nsta/nlta)")
 
         self.results_text.configure(state="normal")
         self.results_text.delete("1.0", "end")

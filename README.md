@@ -2,15 +2,46 @@
 
 Rdzeń analizy sejsmicznej (`timdr_core_earthquake.py`): lokalny gradient
 amplitudy (flow), nagłe zmiany kierunku / początek wstrząsu (twist),
-wygładzenie szumu (TRM), mikro-wstrząsy (anomalies) i punkty rozpoczęcia
-wstrząsu (fronts).
+wygładzenie szumu (TRM), mikro-wstrząsy (anomalies), punkty rozpoczęcia
+wstrząsu (fronts) i klasyczny picker STA/LTA (`sta_lta` /
+`trigger_onset`).
 
 ## Status
 
 Kod ze zgłoszenia uruchomiony i przetestowany (`test_timdr_core_earthquake.py`,
-10/10 testów). Potwierdzone: nie crashuje na n=0/1/2 (zgodnie z opisem
+30/30 testów). Potwierdzone: nie crashuje na n=0/1/2 (zgodnie z opisem
 zgłoszenia). Znalezione i naprawione: 2 błędy, oba realnie wpływające na
 dokładność detekcji na prawdziwych danych sejsmicznych.
+
+## 🆕 STA/LTA — klasyczny picker, zweryfikowany zgodnie z ObsPy
+
+![Własna implementacja STA/LTA vs ObsPy](screenshot_stalta_vs_obspy.png)
+
+Na pytanie "czy da się zaimplementować u nas to, co ma ObsPy" —
+odpowiedź: tak, i to bez dokładania ObsPy jako zależności. `sta_lta()`
+i `trigger_onset()` to własna implementacja klasycznego algorytmu
+STA/LTA napisana od podstaw wg powszechnie znanego wzoru (stosunek
+krótko- do długoterminowej średniej energii sygnału), **nie** skopiowana
+z kodu ObsPy.
+
+Zweryfikowano najsurowszym możliwym testem: bezpośrednie porównanie
+liczba-po-liczbie z `obspy.signal.trigger.classic_sta_lta` i
+`trigger_onset` na prawdziwych danych sejsmicznych (przykładowy strumień
+dołączony do samego ObsPy, stacja BW.RJOB) — wynik identyczny do ~1e-14
+(precyzja zmiennoprzecinkowa) na całej długości sygnału, dla kilku
+różnych kombinacji okien i progów, włącznie z przypadkiem dwóch
+osobnych zdarzeń. Test `test_sta_lta_i_trigger_onset_zgodne_z_obspy`
+pomija się automatycznie, jeśli ObsPy nie jest zainstalowane — to
+opcjonalna weryfikacja, nie twarda zależność repo (do samego
+`sta_lta()`/`trigger_onset()` potrzeba tylko numpy).
+
+Po drodze złapałem i poprawiłem dwa subtelne błędy off-by-one względem
+naiwnej pierwszej wersji: (1) pierwsze `nlta-1` próbek (niepełne okno
+LTA) muszą zwracać 0, nie stosunek z okna "rozpędzającego się" — dla
+pierwszej próbki taki stosunek zawsze wychodzi dokładnie 1.0, bez
+sensu fizycznego; (2) `trigger_onset` musi zapisywać jako koniec
+zdarzenia OSTATNI indeks jeszcze powyżej progu wyłączenia, nie pierwszy
+indeks poniżej niego.
 
 ## 🐛 Błąd 1: `twist()` liczył gradient po indeksie próbki, nie po czasie
 

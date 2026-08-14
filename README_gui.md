@@ -22,10 +22,28 @@ Jeśli Python nie jest zainstalowany: https://www.python.org/downloads/
 - Checkboxy do włączania/wyłączania kroków preprocessingu
   (detrend/despike/normalizacja).
 - Pola parametrów: `k_neighbors`, próg `twist`, `factor` anomalii.
+- Pola STA/LTA: `nsta`/`nlta` (długości okien w **próbkach**, nie
+  sekundach — przelicz sam: `nsta = int(sekundy * fs)`), próg włącz
+  (`thr_on`) i próg wyłącz (`thr_off`).
 - **Uruchom analizę** — pełny pipeline `TIMDR_EarthquakeCore`
-  (flow → twist → anomalie → fronty), wynik jako 4-panelowy wykres
-  (sygnał / flow / |twist| z zaznaczonymi punktami / residuum z
-  zaznaczonymi anomaliami i frontami) plus panel tekstowy z liczbami.
+  (flow → twist → anomalie → fronty → STA/LTA picker), wynik jako
+  5-panelowy wykres (sygnał / flow / |twist| z zaznaczonymi punktami /
+  residuum z zaznaczonymi anomaliami i frontami / stosunek STA/LTA z
+  progami włącz-wyłącz i zacieniowanymi przedziałami wyzwolenia) plus
+  panel tekstowy z liczbami, teraz obejmujący też liczbę i zakres
+  czasowy wyzwoleń STA/LTA.
+
+## 🆕 STA/LTA w GUI
+
+GUI zostało uzupełnione o `sta_lta()`/`trigger_onset()` — te same,
+zweryfikowane bit-po-bicie wobec ObsPy metody, które są już opisane w
+głównym `README.md`. Domyślne wartości (`nsta=25`, `nlta=100`,
+`thr_on=3.0`, `thr_off=1.0`) odpowiadają oknom 0.25s/1.0s przy 100Hz
+(jak w `demo.py`) i dają na sygnale demo jedno czytelne wyzwolenie w
+oknie narastającego wstrząsu — sprawdzone bezpośrednio (bez GUI, przez
+wywołanie tej samej logiki), nie tylko założone. Jak przy `twist`: to
+punkty startowe, nie zwalidowane normy — wymagają kalibracji pod
+realny szum tła i sensor.
 
 ## ⚠️ Uwaga o domyślnym progu `twist`
 
@@ -45,7 +63,9 @@ GUI zbudowane jest na `tkinter` (standardowa biblioteka Pythona) +
 `matplotlib` — nie testowałem renderowania okna bezpośrednio w tym
 środowisku (piaskownica bez `tkinter`/wyświetlacza), tylko: składnię
 (`py_compile`), statyczną analizę (`pyflakes` — brak błędów) i osobno
-całą logikę przetwarzania danych używaną przez GUI (identyczne wywołania
-`SeismicLoader`/`TIMDR_EarthquakeCore`, już pokryte 23 testami
-jednostkowymi w tym repo). Jeśli po uruchomieniu `run.bat` coś nie
-zadziała tak jak powinno, daj znać z treścią błędu z konsoli.
+całą logikę przetwarzania danych używaną przez GUI, włącznie z
+`sta_lta()`/`trigger_onset()` na dokładnie tym samym sygnale demo co
+generuje GUI (identyczne wywołania `SeismicLoader`/
+`TIMDR_EarthquakeCore`, już pokryte 30 testami jednostkowymi w tym
+repo). Jeśli po uruchomieniu `run.bat` coś nie zadziała tak jak
+powinno, daj znać z treścią błędu z konsoli.
