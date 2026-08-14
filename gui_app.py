@@ -99,6 +99,11 @@ class TimdrEarthquakeGUI(tk.Tk):
         self._build_controls(left)
         self._build_plot(right)
 
+        self.status_var = tk.StringVar(value="Gotowy. Wczytaj CSV albo wygeneruj sygnał demo.")
+        status_bar = ttk.Label(self, textvariable=self.status_var, relief="sunken",
+                                anchor="w", padding=(8, 4))
+        status_bar.pack(fill="x", side="bottom")
+
     def _build_scrollable_left(self, container):
         """Lewa kolumna (dane/preprocessing/parametry/wyniki) w wielu
         wypadkach nie mieści się w wysokości okna (np. mniejszy monitor,
@@ -137,11 +142,6 @@ class TimdrEarthquakeGUI(tk.Tk):
                                             canvas.unbind_all("<Button-5>")))
 
         return inner
-
-        self.status_var = tk.StringVar(value="Gotowy. Wczytaj CSV albo wygeneruj sygnał demo.")
-        status_bar = ttk.Label(self, textvariable=self.status_var, relief="sunken",
-                                anchor="w", padding=(8, 4))
-        status_bar.pack(fill="x", side="bottom")
 
     # ------------------------------------------------------------
     def _build_controls(self, parent):
