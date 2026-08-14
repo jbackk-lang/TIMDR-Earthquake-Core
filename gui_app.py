@@ -88,15 +88,55 @@ class TimdrEarthquakeGUI(tk.Tk):
         body = ttk.Frame(self)
         body.pack(fill="both", expand=True, padx=16, pady=8)
 
-        left = ttk.Frame(body, width=300)
-        left.pack(side="left", fill="y", padx=(0, 12))
-        left.pack_propagate(False)
+        left_container = ttk.Frame(body, width=300)
+        left_container.pack(side="left", fill="y", padx=(0, 12))
+        left_container.pack_propagate(False)
 
         right = ttk.Frame(body)
         right.pack(side="left", fill="both", expand=True)
 
+        left = self._build_scrollable_left(left_container)
         self._build_controls(left)
         self._build_plot(right)
+
+    def _build_scrollable_left(self, container):
+        """Lewa kolumna (dane/preprocessing/parametry/wyniki) w wielu
+        wypadkach nie mieści się w wysokości okna (np. mniejszy monitor,
+        więcej pól po dodaniu STA/LTA) - bez przewijania przycisk
+        'Uruchom analizę' i panel wyników potrafiły wypaść poza widoczny
+        obszar. Owijamy zawartość w Canvas + Scrollbar, żeby zawsze
+        dało się do nich przewinąć niezależnie od wysokości okna."""
+        canvas = tk.Canvas(container, bg=self.COLORS["bg"], highlightthickness=0,
+                            width=284)
+        scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=scrollbar.set)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        inner = ttk.Frame(canvas)
+        inner_id = canvas.create_window((0, 0), window=inner, anchor="nw", width=284)
+
+        def _on_inner_configure(_event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        def _on_canvas_configure(event):
+            canvas.itemconfigure(inner_id, width=event.width)
+
+        inner.bind("<Configure>", _on_inner_configure)
+        canvas.bind("<Configure>", _on_canvas_configure)
+
+        def _on_mousewheel(event):
+            delta = -1 * (event.delta // 120) if event.delta else (1 if event.num == 5 else -1)
+            canvas.yview_scroll(int(delta), "units")
+
+        canvas.bind("<Enter>", lambda _e: (canvas.bind_all("<MouseWheel>", _on_mousewheel),
+                                            canvas.bind_all("<Button-4>", _on_mousewheel),
+                                            canvas.bind_all("<Button-5>", _on_mousewheel)))
+        canvas.bind("<Leave>", lambda _e: (canvas.unbind_all("<MouseWheel>"),
+                                            canvas.unbind_all("<Button-4>"),
+                                            canvas.unbind_all("<Button-5>")))
+
+        return inner
 
         self.status_var = tk.StringVar(value="Gotowy. Wczytaj CSV albo wygeneruj sygnał demo.")
         status_bar = ttk.Label(self, textvariable=self.status_var, relief="sunken",
@@ -105,37 +145,47 @@ class TimdrEarthquakeGUI(tk.Tk):
 
     # ------------------------------------------------------------
     def _build_controls(self, parent):
-        data_frame = ttk.Labelframe(parent, text="1. Dane wejściowe", padding=10)
-        data_frame.pack(fill="x", pady=(0, 10))
+        # Przycisk analizy i pasek statusu na samej górze, żeby zawsze
+        # były widoczne bez przewijania - reszta (dane/preprocessing/
+        # parametry/wyniki) jest niżej, w przewijalnej kolumnie.
+        ttk.Button(parent, text="▶  Uruchom analizę", style="Accent.TButton",
+                   command=self.on_analyze).pack(fill="x", pady=(0, 10))
 
-        ttk.Button(data_frame, text="📂 Wczytaj CSV...", command=self.on_load_csv).pack(fill="x", pady=3)
-        ttk.Button(data_frame, text="🎲 Wygeneruj sygnał demo", command=self.on_load_demo).pack(fill="x", pady=3)
+        data_frame = ttk.Labelframe(parent, text="1. Dane wejściowe", padding=8)
+        data_frame.pack(fill="x", pady=(0, 8))
+
+        btn_row = ttk.Frame(data_frame)
+        btn_row.pack(fill="x")
+        ttk.Button(btn_row, text="📂 Wczytaj CSV...", command=self.on_load_csv).pack(
+            side="left", expand=True, fill="x", padx=(0, 3))
+        ttk.Button(btn_row, text="🎲 Demo", command=self.on_load_demo).pack(
+            side="left", expand=True, fill="x", padx=(3, 0))
 
         self.t_col_var = tk.StringVar(value="t")
         self.s_col_var = tk.StringVar(value="s")
         col_row = ttk.Frame(data_frame)
         col_row.pack(fill="x", pady=(6, 0))
-        ttk.Label(col_row, text="kolumna t:").grid(row=0, column=0, sticky="w")
-        ttk.Entry(col_row, textvariable=self.t_col_var, width=8).grid(row=0, column=1, padx=4)
-        ttk.Label(col_row, text="kolumna s:").grid(row=0, column=2, sticky="w", padx=(8, 0))
-        ttk.Entry(col_row, textvariable=self.s_col_var, width=8).grid(row=0, column=3, padx=4)
+        ttk.Label(col_row, text="kol. t:").grid(row=0, column=0, sticky="w")
+        ttk.Entry(col_row, textvariable=self.t_col_var, width=6).grid(row=0, column=1, padx=4)
+        ttk.Label(col_row, text="kol. s:").grid(row=0, column=2, sticky="w", padx=(8, 0))
+        ttk.Entry(col_row, textvariable=self.s_col_var, width=6).grid(row=0, column=3, padx=4)
 
         self.data_info_var = tk.StringVar(value="Brak wczytanych danych.")
         ttk.Label(data_frame, textvariable=self.data_info_var, wraplength=250,
-                  foreground="#607d8b").pack(fill="x", pady=(6, 0))
+                  foreground="#607d8b").pack(fill="x", pady=(4, 0))
 
-        prep_frame = ttk.Labelframe(parent, text="2. Preprocessing (SeismicLoader)", padding=10)
-        prep_frame.pack(fill="x", pady=(0, 10))
+        prep_frame = ttk.Labelframe(parent, text="2. Preprocessing", padding=8)
+        prep_frame.pack(fill="x", pady=(0, 8))
 
         self.detrend_var = tk.BooleanVar(value=True)
         self.despike_var = tk.BooleanVar(value=True)
         self.normalize_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(prep_frame, text="Detrend (usuń dryf)", variable=self.detrend_var).pack(anchor="w")
-        ttk.Checkbutton(prep_frame, text="Despike (usuń odosobnione skoki)", variable=self.despike_var).pack(anchor="w")
+        ttk.Checkbutton(prep_frame, text="Detrend", variable=self.detrend_var).pack(anchor="w")
+        ttk.Checkbutton(prep_frame, text="Despike", variable=self.despike_var).pack(anchor="w")
         ttk.Checkbutton(prep_frame, text="Normalizacja amplitudy", variable=self.normalize_var).pack(anchor="w")
 
-        param_frame = ttk.Labelframe(parent, text="3. Parametry detekcji", padding=10)
-        param_frame.pack(fill="x", pady=(0, 10))
+        param_frame = ttk.Labelframe(parent, text="3. Parametry detekcji", padding=8)
+        param_frame.pack(fill="x", pady=(0, 8))
 
         self.k_var = tk.StringVar(value="8")
         # UWAGA: domyslny prog "0.4" z timdr_core_earthquake.py byl
@@ -147,12 +197,13 @@ class TimdrEarthquakeGUI(tk.Tk):
         self.twist_thr_var = tk.StringVar(value="20")
         self.anomaly_factor_var = tk.StringVar(value="3.0")
 
-        self._param_row(param_frame, "k_neighbors:", self.k_var)
-        self._param_row(param_frame, "próg twist:", self.twist_thr_var)
-        self._param_row(param_frame, "factor anomalii:", self.anomaly_factor_var)
+        self._param_grid(param_frame, [
+            ("k_neighbors:", self.k_var), ("próg twist:", self.twist_thr_var),
+            ("factor anom.:", self.anomaly_factor_var),
+        ])
 
-        stalta_frame = ttk.Labelframe(parent, text="4. STA/LTA (picker)", padding=10)
-        stalta_frame.pack(fill="x", pady=(0, 10))
+        stalta_frame = ttk.Labelframe(parent, text="4. STA/LTA (picker)", padding=8)
+        stalta_frame.pack(fill="x", pady=(0, 8))
 
         # Domyslne 25/100 probek = 0.25s/1.0s przy 100Hz (jak w demo.py,
         # zweryfikowane wobec ObsPy - patrz README). Progi 3.0/1.0 to
@@ -163,27 +214,32 @@ class TimdrEarthquakeGUI(tk.Tk):
         self.thr_on_var = tk.StringVar(value="3.0")
         self.thr_off_var = tk.StringVar(value="1.0")
 
-        self._param_row(stalta_frame, "nsta (próbki):", self.nsta_var)
-        self._param_row(stalta_frame, "nlta (próbki):", self.nlta_var)
-        self._param_row(stalta_frame, "próg włącz:", self.thr_on_var)
-        self._param_row(stalta_frame, "próg wyłącz:", self.thr_off_var)
+        self._param_grid(stalta_frame, [
+            ("nsta:", self.nsta_var), ("nlta:", self.nlta_var),
+            ("próg wł.:", self.thr_on_var), ("próg wył.:", self.thr_off_var),
+        ])
 
-        ttk.Button(parent, text="▶  Uruchom analizę", style="Accent.TButton",
-                   command=self.on_analyze).pack(fill="x", pady=(4, 10))
-
-        results_frame = ttk.Labelframe(parent, text="Wyniki", padding=10)
-        results_frame.pack(fill="both", expand=True)
+        results_frame = ttk.Labelframe(parent, text="Wyniki", padding=8)
+        results_frame.pack(fill="both", expand=True, pady=(0, 4))
         self.results_text = tk.Text(results_frame, height=12, width=32, font=("Consolas", 9),
                                      bg="white", relief="flat", wrap="word")
         self.results_text.pack(fill="both", expand=True)
         self.results_text.insert("1.0", "Wyniki analizy pojawią się tutaj.")
         self.results_text.configure(state="disabled")
 
-    def _param_row(self, parent, label, var):
-        row = ttk.Frame(parent)
-        row.pack(fill="x", pady=2)
-        ttk.Label(row, text=label, width=14).pack(side="left")
-        ttk.Entry(row, textvariable=var, width=10).pack(side="left")
+    def _param_grid(self, parent, label_var_pairs, per_row=2):
+        """Kompaktowa siatka pól parametrów, `per_row` na wiersz -
+        zastępuje wcześniejsze układanie jednego pola pod drugim, które
+        przy większej liczbie parametrów (STA/LTA dodało 4 kolejne pola)
+        zbytnio wydłużało lewą kolumnę."""
+        grid = ttk.Frame(parent)
+        grid.pack(fill="x")
+        for i, (label, var) in enumerate(label_var_pairs):
+            r, c = divmod(i, per_row)
+            cell = ttk.Frame(grid)
+            cell.grid(row=r, column=c, sticky="w", padx=(0, 10), pady=2)
+            ttk.Label(cell, text=label, width=10).pack(side="left")
+            ttk.Entry(cell, textvariable=var, width=7).pack(side="left")
 
     # ------------------------------------------------------------
     def _build_plot(self, parent):

@@ -33,6 +33,20 @@ Jeśli Python nie jest zainstalowany: https://www.python.org/downloads/
   panel tekstowy z liczbami, teraz obejmujący też liczbę i zakres
   czasowy wyzwoleń STA/LTA.
 
+## 🐛 Poprawka układu: lewa kolumna zbyt długa, przycisk analizy niewidoczny
+
+Po dodaniu sekcji STA/LTA lewa kolumna (dane → preprocessing →
+parametry → STA/LTA → wyniki) urosła na tyle, że przy typowej
+wysokości okna przycisk **"Uruchom analizę"** i panel wyników wypadały
+poza widoczny obszar - okno nie przewijało się, więc były całkowicie
+niedostępne. Naprawione dwutorowo: (1) `_param_grid()` układa pola
+parametrów po 2 w rzędzie zamiast jedno pod drugim (STA/LTA zajmuje
+teraz 2 rzędy zamiast 4), (2) cała lewa kolumna jest owinięta w
+przewijalny `Canvas` (kółko myszy też działa), więc nawet na małym
+oknie wszystko pozostaje osiągalne. Przycisk analizy przeniesiony też
+na sam początek kolumny, nad sekcją danych - zawsze widoczny jako
+pierwszy element bez przewijania.
+
 ## 🆕 STA/LTA w GUI
 
 GUI zostało uzupełnione o `sta_lta()`/`trigger_onset()` — te same,
