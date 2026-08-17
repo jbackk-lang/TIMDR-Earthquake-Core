@@ -180,6 +180,40 @@ next_idx, dt = cat.nearest_aftershock(t, magnitude)
 Uruchomienie: `python demo_usgs_catalog.py` (instrukcja odświeżenia
 danych live na aktualny katalog USGS w nagłówku pliku).
 
+## 🆕 Scenariusz "synoptyka" — na ile prognozowanie jest w ogóle możliwe?
+
+Osobny test (folder [`synoptyk-analiza/`](synoptyk-analiza/), pełny kod +
+dane + wykresy w `synoptyk-analiza/deliverable.zip`): sprawdzone na
+realnych, żywych danych USGS (nie syntetycznych), zawsze kauzalnie
+(prognoza w chwili D używa wyłącznie danych sprzed D).
+
+**Test 1 — sekwencja Ridgecrest 2019** (M4.0+, 102 zdarzenia, mainshock
+M7.1): prawo Omori-Utsu dopasowane kauzalnie do prognozy liczby
+wstrząsów wtórnych dało średni błąd **2.6 zdarzenia** — wobec **32.2**
+dla stałego tła Poissona i **12.3** dla naiwnej ekstrapolacji ostatnich
+24h. Krótkoterminowe prognozowanie aftershocków *działa* i daje
+policzalną przewagę (to ta sama rodzina modeli, której USGS używa
+operacyjnie w swoim "Aftershock Forecast").
+
+**Test 2 — katalog globalny M6.3+, 2016-2026** (699 zdarzeń,
+zweryfikowane 1:1 z licznikiem `fdsnws/event/1/count`): `trend_z` z
+`catalog_core.trend()` miał korelację **r=0.04** (szum) z faktyczną
+przyszłą aktywnością w kolejnych 30 dniach; prognoza z tempa ostatnich
+90 dni wypadła *gorzej* niż zwykła stała średnia historyczna (MAE 2.67
+vs 2.37), a dla progu M7.0+ Brier score Poissona (0.31) był gorszy niż
+"zawsze ta sama" prognoza bazowa (0.24). Bez trwającej sekwencji żaden
+testowany sygnał nie bije zwykłej stałej częstości bazowej — zgodnie z
+konsensusem sejsmologicznym, że w dużej skali trzęsienia ziemi
+zachowują się w przybliżeniu bezpamięciowo (proces Poissona).
+
+**Wniosek:** "synoptyk" ma sens jako krótkoterminowa, probabilistyczna
+prognoza aftershocków tuż po dużym wstrząsie (Test 1) — ale nie jako
+ogólne "kiedy/gdzie uderzy następne duże trzęsienie" bez informacji o
+trwającej sekwencji (Test 2). `anomalies()` i `rhythm()` z
+`catalog_core.py` dalej działają poprawnie jako narzędzia
+*diagnostyczne* (opis tego, co już się wydarzyło), nie jako
+prognostyczne.
+
 ## Przykład użycia
 
 ```python
