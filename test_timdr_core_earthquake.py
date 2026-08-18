@@ -162,6 +162,216 @@ def test_trigger_onset_dwa_oddzielne_zdarzenia(core):
     assert len(onsets) == 2
 
 
+# ============================================================
+# Helper _nearest_k_bounds (zamiennik KDTree) — punkt 2
+# ============================================================
+
+def test_nearest_k_bounds_zgodny_z_kdtree_przy_przerwie(core):
+    """Regresja: nowy helper musi dawac dokladnie to samo sasiedztwo co
+    stary KDTree, TAKZE przy nierownomiernym probkowaniu z przerwa - to
+    najbardziej krytyczny przypadek, bo tu sztywne okno po indeksie by sie
+    wysypalo."""
+    from scipy.spatial import KDTree
+    rng = np.random.default_rng(42)
+    t = np.sort(rng.uniform(0, 1, 40))
+    t = np.concatenate([t, t[-1] + 3.0 + np.sort(rng.uniform(0, 1, 40))])
+    k = core._safe_k(len(t))
+    tree = KDTree(t.reshape(-1, 1))
+    for i, ti in enumerate(t):
+        _, idx = tree.query([ti], k=k)
+        idx_old = set(np.atleast_1d(idx).tolist())
+        lo, hi = core._nearest_k_bounds(t, i, k)
+        assert set(range(lo, hi + 1)) == idx_old, f"niezgodnosc przy probce {i}"
+
+
+def test_flow_i_trm_bez_regresji_po_usunieciu_kdtree(core):
+    """flow()/trm() musza dalej dzialac identycznie (do precyzji lstsq) po
+    zamianie KDTree na helper - w tym na danych z przerwa."""
+    rng = np.random.default_rng(7)
+    n = 100
+    t = np.sort(rng.uniform(0, 10, n))
+    s = rng.normal(size=n)
+    flow_grad = core.flow(t, s)
+    smooth = core.trm(t, s)
+    assert len(flow_grad) == n
+    assert len(smooth) == n
+    assert not np.any(np.isnan(flow_grad))
+    assert not np.any(np.isnan(smooth))
+
+
+# ============================================================
+# TRM: method="adaptive" / method="savgol" — punkt 4
+# ============================================================
+
+def test_trm_nieznana_metoda_rzuca_wyjatek(core):
+    with pytest.raises(ValueError):
+        core.trm(np.arange(10) * 0.01, np.ones(10), method="cos_tam")
+
+
+def test_trm_adaptive_wyglasza_szum(core):
+    rng = np.random.default_rng(3)
+    n = 150
+    t = np.arange(n) * 0.01
+    clean = np.sin(2 * np.pi * 1.0 * t)
+    s = clean + rng.normal(0, 0.3, n)
+    smooth = core.trm(t, s, method="adaptive")
+    assert np.std(smooth - clean) < np.std(s - clean)
+
+
+def test_trm_adaptive_mniej_wygladza_wokol_prawdziwego_skoku(core):
+    """Idea adaptacji: w miejscu prawdziwej duzej zmiany okno ma byc
+    mniejsze (mniej 'usztywnia' skok) niz w spokojnym tle."""
+    rng = np.random.default_rng(4)
+    n = 200
+    t = np.arange(n) * 0.01
+    s = rng.normal(0, 0.02, n)
+    s[100:] += 5.0  # trwaly skok (step)
+    fixed = core.trm(t, s, method="median")
+    adaptive = core.trm(t, s, method="adaptive")
+    # w okolicy skoku adaptacyjne wygladzenie powinno szybciej "nadazyc"
+    # za nowym poziomem niz stale okno medianowe
+    err_fixed = abs(fixed[103] - s[103])
+    err_adapt = abs(adaptive[103] - s[103])
+    assert err_adapt <= err_fixed + 1e-9
+
+
+def test_trm_savgol_dziala_i_wyglasza(core):
+    rng = np.random.default_rng(5)
+    n = 101
+    t = np.arange(n) * 0.01
+    clean = np.sin(2 * np.pi * 1.0 * t)
+    s = clean + rng.normal(0, 0.2, n)
+    smooth = core.trm(t, s, method="savgol", window_length=11, polyorder=3)
+    assert len(smooth) == n
+    assert np.std(smooth - clean) < np.std(s - clean)
+
+
+def test_trm_savgol_zle_okno_rzuca_wyjatek(core):
+    with pytest.raises(ValueError):
+        core.trm(np.arange(20) * 0.01, np.ones(20), method="savgol",
+                  window_length=2, polyorder=3)
+
+
+# ============================================================
+# classify_anomalies — punkt 5
+# ============================================================
+
+def test_classify_anomalies_brak_dropout_na_zwyklym_szumie(core):
+    # normalny szum tla, bez zadnego biegu identycznych wartosci - w
+    # odroznieniu od sygnalu stale=0, ktory SAM W SOBIE jest dropoutem
+    # (patrz test ponizej). Pojedyncze przypadkowe przekroczenie 3*MAD na
+    # czystym szumie jest oczekiwane (factor=3.0 nie daje zera false
+    # positives na skonczonej probce) - to nie jest to, co tu sprawdzamy.
+    rng = np.random.default_rng(99)
+    t = np.arange(50) * 0.01
+    s = rng.normal(0, 0.02, 50)
+    events = core.classify_anomalies(t, s)
+    assert all(e["type"] != "dropout" for e in events)
+
+
+def test_classify_anomalies_stala_wartosc_to_dropout(core):
+    """Sygnal idealnie stale=0 przez wiele probek jest sam w sobie
+    podejrzany (prawdziwy kanal sejsmiczny prawie zawsze ma jakis szum
+    tla) - powinien zostac zaraportowany jako dropout, nie zignorowany."""
+    t = np.arange(50) * 0.01
+    s = np.zeros(50)
+    events = core.classify_anomalies(t, s)
+    assert len(events) == 1 and events[0]["type"] == "dropout"
+
+
+def test_classify_anomalies_wykrywa_impuls(core):
+    rng = np.random.default_rng(10)
+    n = 200
+    t = np.arange(n) * 0.01
+    s = rng.normal(0, 0.02, n)
+    s[100] += 3.0  # pojedyncza probka, natychmiast wraca do tla
+    events = core.classify_anomalies(t, s)
+    assert any(e["type"] == "impuls" and e["start"] <= 100 <= e["end"] for e in events)
+
+
+def test_classify_anomalies_wykrywa_spike(core):
+    rng = np.random.default_rng(11)
+    n = 200
+    t = np.arange(n) * 0.01
+    s = rng.normal(0, 0.02, n)
+    s[100:103] += 3.0  # krotki wybuch (3 probki), potem wraca do tla
+    events = core.classify_anomalies(t, s)
+    assert any(e["type"] == "spike" for e in events)
+
+
+def test_classify_anomalies_wykrywa_step(core):
+    rng = np.random.default_rng(12)
+    n = 200
+    t = np.arange(n) * 0.01
+    s = rng.normal(0, 0.02, n)
+    s[100:] += 5.0  # trwaly, natychmiastowy skok poziomu - nie wraca
+    events = core.classify_anomalies(t, s)
+    assert any(e["type"] == "step" for e in events)
+
+
+def test_classify_anomalies_wykrywa_drift(core):
+    rng = np.random.default_rng(13)
+    n = 300
+    t = np.arange(n) * 0.01
+    s = rng.normal(0, 0.02, n)
+    s[150:200] += np.linspace(0, 8.0, 50)  # stopniowo narastajacy wstrzas
+    s[200:] += 8.0  # zostaje na nowym poziomie
+    events = core.classify_anomalies(t, s)
+    assert any(e["type"] == "drift" for e in events)
+
+
+def test_classify_anomalies_wykrywa_dropout(core):
+    rng = np.random.default_rng(14)
+    n = 200
+    t = np.arange(n) * 0.01
+    s = rng.normal(0, 0.5, n)
+    s[100:115] = 5.0  # czujnik "utkniety" na stalej, odstajacej wartosci
+    events = core.classify_anomalies(t, s)
+    assert any(e["type"] == "dropout" for e in events)
+
+
+# ============================================================
+# hybrid_trigger — punkt 7
+# ============================================================
+
+def test_hybrid_trigger_potwierdza_prawdziwy_wstrzas(core):
+    rng = np.random.default_rng(20)
+    n = 500
+    t = np.arange(n) * 0.01
+    s = rng.normal(0, 0.05, n)
+    s[300:340] += np.sin(np.linspace(0, 6 * np.pi, 40)) * 6.0  # wyrazny wstrzas
+    confirmed, rejected = core.hybrid_trigger(t, s, nsta=5, nlta=50)
+    assert len(confirmed) > 0
+    # nie wymagamy dokladnego startu=300 (STA/LTA/twist maja swoja bezwladnosc),
+    # tylko ze potwierdzone okno POKRYWA SIE z prawdziwym wstrzasem 300-340
+    assert any(c[0] <= 340 and c[1] >= 300 for c in confirmed)
+
+
+def test_hybrid_trigger_odrzuca_czysty_szum_energetyczny_bez_twistu_i_anomalii(core):
+    """Wzrost energii bez charakterystyki twistu ani statystycznej anomalii
+    (np. szerokopasmowy szum o wiekszej amplitudzie, ale bez odstajacych
+    probek wzgledem lokalnego tla) nie powinien byc potwierdzony."""
+    rng = np.random.default_rng(21)
+    n = 500
+    s = rng.normal(0, 0.01, n)
+    s[300:340] = rng.normal(0, 0.011, 40)  # ledwo wiekszy szum, nie realne zdarzenie
+    t = np.arange(n) * 0.01
+    confirmed, rejected = core.hybrid_trigger(t, s, nsta=5, nlta=50,
+                                                anomaly_factor=5.0, twist_threshold=2.0)
+    assert len(confirmed) == 0
+
+
+def test_hybrid_trigger_zwraca_powod_odrzucenia(core):
+    rng = np.random.default_rng(22)
+    n = 300
+    s = rng.normal(0, 0.01, n)
+    t = np.arange(n) * 0.01
+    confirmed, rejected = core.hybrid_trigger(t, s, nsta=5, nlta=30,
+                                                anomaly_factor=5.0, twist_threshold=2.0)
+    for r in rejected:
+        assert "missing_twist" in r and "missing_anomaly" in r
+
+
 def test_sta_lta_i_trigger_onset_zgodne_z_obspy(core):
     """
     Kluczowy test wiarygodności: wlasna implementacja STA/LTA i

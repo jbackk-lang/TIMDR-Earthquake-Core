@@ -9,7 +9,7 @@ Wejście: t (znaczniki czasu, sekundy, ściśle rosnące), s (amplituda).
 """
 
 import numpy as np
-from scipy.spatial import KDTree
+from scipy.signal import savgol_filter
 
 
 class TIMDR_EarthquakeCore:
@@ -17,11 +17,13 @@ class TIMDR_EarthquakeCore:
     TIMDR Earthquake Detector Core
     - flow: lokalny gradient amplitudy sygnału sejsmicznego (LSQ względem czasu)
     - twist: nagłe zmiany kierunku (początek wstrząsu)
-    - trm: wygładzenie szumu sejsmicznego
+    - trm: wygładzenie szumu sejsmicznego (median / adaptive / savgol)
     - anomalies: mikro-wstrząsy
+    - classify_anomalies: klasyfikacja ksztaltu anomalii (impuls/spike/step/drift/dropout)
     - fronts: punkt rozpoczęcia wstrząsu
     - sta_lta / trigger_onset: klasyczny picker STA/LTA (własna
       implementacja, zweryfikowana zgodność z ObsPy - patrz docstringi)
+    - hybrid_trigger: STA/LTA potwierdzony przez TIMDR (twist + anomalie)
     """
 
     def __init__(self, k_neighbors=8, mad_scale=1.4826):
@@ -41,6 +43,41 @@ class TIMDR_EarthquakeCore:
         return t, s
 
     # -----------------------------
+    # Wspolny helper: k najblizszych sasiadow PO CZASIE, bez KDTree
+    # -----------------------------
+    def _nearest_k_bounds(self, t, i, k):
+        """
+        Zwraca (lo, hi) - wlaczne granice ciaglego wycinka t[lo:hi+1]
+        zawierajacego k probek najblizszych t[i] w sensie |t[j]-t[i]|.
+
+        Poprawka wydajnosciowa (bylo: KDTree na t.reshape(-1,1) per-punkt,
+        z narzutem budowy drzewa + wywolania query() w petli Python).
+        Poniewaz t jest SCISLE ROSNACE (wymuszone w _validate), k najblizszych
+        po czasie zawsze tworzy CIAGLY przedzial indeksow wokol i - w prawo i
+        w lewo odleglosc od t[i] rosnie monotonicznie, wiec nie trzeba
+        przeszukiwac calej tablicy ani budowac drzewa: wystarczy dwuwskaznikowe
+        rozszerzanie okna [lo, hi] o probke blizsza w danym kroku.
+
+        WAZNE: to NIE jest to samo co sztywne okno po INDEKSIE [i-k:i+k].
+        Przy nierownomiernym probkowaniu (przerwa w telemetrii, scalanie
+        segmentow) okno po indeksie zlapaloby probki odlegle w czasie o
+        sekundy zamiast faktycznie najblizszych - dokladnie ten blad, ktory
+        `twist()` juz raz naprawil (patrz jego docstring). Ten helper liczy
+        sasiedztwo po REALNEJ odleglosci w czasie `t`, wiec zachowuje sie
+        identycznie jak KDTree na t.reshape(-1,1), tylko bez jego narzutu.
+        """
+        n = len(t)
+        lo = hi = i
+        while (hi - lo + 1) < k and (lo > 0 or hi < n - 1):
+            left_ok = lo > 0
+            right_ok = hi < n - 1
+            if left_ok and (not right_ok or (t[i] - t[lo - 1]) <= (t[hi + 1] - t[i])):
+                lo -= 1
+            else:
+                hi += 1
+        return lo, hi
+
+    # -----------------------------
     # FLOW — lokalny gradient LSQ
     # -----------------------------
     def flow(self, t, s):
@@ -50,14 +87,12 @@ class TIMDR_EarthquakeCore:
             return np.zeros_like(s)
 
         k = self._safe_k(n)
-        tree = KDTree(t.reshape(-1, 1))
         grad = np.zeros_like(s)
 
-        for i, ti in enumerate(t):
-            _, idx = tree.query([ti], k=k)
-            idx = np.atleast_1d(idx)
-            tt = t[idx]
-            ss = s[idx]
+        for i in range(n):
+            lo, hi = self._nearest_k_bounds(t, i, k)
+            tt = t[lo:hi + 1]
+            ss = s[lo:hi + 1]
 
             A = np.column_stack([tt, np.ones_like(tt)])
             try:
@@ -109,24 +144,92 @@ class TIMDR_EarthquakeCore:
         return twist_points, twist_strength
 
     # -----------------------------
-    # TRM — wygładzenie medianowe
+    # TRM — wygładzenie (median / adaptive / savgol)
     # -----------------------------
-    def trm(self, t, s):
+    def trm(self, t, s, method="median", k_min=3, k_max=None,
+             window_length=None, polyorder=3):
+        """
+        method="median" (domyslne, jak dotad): mediana z k najblizszych
+        probek po czasie - k stale (self.k_neighbors).
+
+        method="adaptive": jak wyzej, ale rozmiar okna k dopasowuje sie
+        lokalnie do zmiennosci sygnalu - tam gdzie lokalna zmiennosc jest
+        wysoka (blisko realnego wstrzasu/przejscia), okno jest MNIEJSZE, zeby
+        mediana nie "usztywniala" prawdziwej zmiany; tam gdzie sygnal jest
+        spokojny (szum tla), okno jest WIEKSZE, dla mocniejszego wygladzenia
+        (rozwiazuje dokladnie problem opisany przy propozycji: stale k jest
+        albo za sztywne w wysokiej amplitudzie, albo za miekkie w niskiej).
+        k_min/k_max ograniczaja zakres adaptacji (domyslnie k_max = 3*k_neighbors).
+
+        method="savgol": filtr Savitzky-Golay (scipy.signal.savgol_filter)
+        jako alternatywa dla mediany - lepiej zachowuje ksztalt (np. strome
+        zbocze wstrzasu) niz mediana, kosztem wiekszej wrazliwosci na
+        pojedyncze odstajace probki. UWAGA: savgol dziala na indeksach, nie
+        na `t` - zaklada w przyblizeniu rownomierne probkowanie (typowe dla
+        pojedynczego kanalu sejsmicznego o stalej czestotliwosci probkowania;
+        NIE uzywac przy nierownomiernych/scalanych seriach z lukami czasowymi -
+        do tego sluzy method="median"/"adaptive", ktore licza sasiedztwo po
+        rzeczywistym `t`).
+        """
         t, s = self._validate(t, s)
         n = len(t)
         if n < 2:
             return s.copy()
 
+        if method == "savgol":
+            return self._trm_savgol(s, window_length, polyorder)
+        if method == "adaptive":
+            return self._trm_adaptive(t, s, k_min=k_min, k_max=k_max)
+        if method != "median":
+            raise ValueError(f"nieznana metoda trm: {method!r} (median/adaptive/savgol)")
+
         k = self._safe_k(n)
-        tree = KDTree(t.reshape(-1, 1))
         smooth = np.zeros_like(s)
-
-        for i, ti in enumerate(t):
-            _, idx = tree.query([ti], k=k)
-            idx = np.atleast_1d(idx)
-            smooth[i] = np.median(s[idx])
-
+        for i in range(n):
+            lo, hi = self._nearest_k_bounds(t, i, k)
+            smooth[i] = np.median(s[lo:hi + 1])
         return smooth
+
+    def _trm_adaptive(self, t, s, k_min=3, k_max=None):
+        n = len(t)
+        base_k = self._safe_k(n)
+        if k_max is None:
+            k_max = max(self.k_neighbors * 3, base_k)
+        k_max = min(k_max, n)
+        k_min = max(1, min(k_min, k_max))
+
+        local_std = np.zeros(n)
+        for i in range(n):
+            lo, hi = self._nearest_k_bounds(t, i, base_k)
+            local_std[i] = np.std(s[lo:hi + 1])
+
+        std_max = np.max(local_std)
+        norm = local_std / std_max if std_max > 1e-12 else np.zeros(n)
+        # wysoka lokalna zmiennosc (norm~1) -> male okno (k_min);
+        # niska lokalna zmiennosc (norm~0) -> duze okno (k_max)
+        k_adapt = np.clip(
+            np.round(k_max - norm * (k_max - k_min)).astype(int), k_min, k_max
+        )
+
+        smooth = np.zeros_like(s)
+        for i in range(n):
+            lo, hi = self._nearest_k_bounds(t, i, int(k_adapt[i]))
+            smooth[i] = np.median(s[lo:hi + 1])
+        return smooth
+
+    def _trm_savgol(self, s, window_length, polyorder):
+        n = len(s)
+        if window_length is None:
+            window_length = min(n if n % 2 == 1 else n - 1, max(polyorder + 2, 11))
+            if window_length % 2 == 0:
+                window_length -= 1
+        if window_length < polyorder + 2:
+            raise ValueError(
+                f"window_length ({window_length}) musi byc >= polyorder+2 ({polyorder + 2})"
+            )
+        if window_length > n:
+            raise ValueError(f"window_length ({window_length}) wiekszy niz dlugosc sygnalu ({n})")
+        return savgol_filter(s, window_length=window_length, polyorder=polyorder)
 
     # -----------------------------
     # ANOMALIE — mikro-wstrząsy
@@ -160,6 +263,125 @@ class TIMDR_EarthquakeCore:
         anomaly_points = np.where(np.abs(residuals) > threshold)[0]
 
         return anomaly_points, residuals, threshold
+
+    # -----------------------------
+    # KLASYFIKACJA ANOMALII (ksztalt) — punkt 5
+    # -----------------------------
+    def classify_anomalies(self, t, s, factor=3.0, merge_gap=3, context=5,
+                             revert_tol_factor=1.5, min_dropout_len=5,
+                             dropout_eps=1e-9):
+        """
+        Grupuje punkty z anomalies() w zdarzenia (sasiednie indeksy w
+        odleglosci <= merge_gap sa jednym zdarzeniem) i kwalifikuje KSZTALT
+        kazdego zdarzenia do jednej z 5 kategorii opisowych — NIE fizycznej
+        interpretacji sejsmologicznej (na to trzeba widma/glebokosci/
+        wielu stacji, patrz dyskusja o punktach 1/3/6), tylko ksztaltu
+        przebiegu wokol anomalii, co jest policzalne z samego s(t):
+
+        - "impuls": pojedyncza probka, mocno odstaje, natychmiast wraca do
+          poprzedniego poziomu.
+        - "spike":  krotki wybuch (kilka probek), potem wraca do poziomu
+          sprzed zdarzenia.
+        - "step":   poziom PRZED i PO zdarzeniu rozni sie trwale (nie wraca),
+          bez wyraznego stopniowego narastania w trakcie zdarzenia.
+        - "drift":  jak step, ale zmiana narasta stopniowo w trakcie
+          zdarzenia (monotoniczny trend), a nie skokiem na starcie.
+        - "dropout": dlugi biep (>= min_dropout_len probek) PRAKTYCZNIE
+          IDENTYCZNYCH wartosci - typowe dla utknietego czujnika/telemetrii,
+          nie realnego ruchu gruntu (ktory prawie zawsze ma jakis szum tla;
+          realny sygnal powtarzajacy dokladnie ta sama wartosc przez wiele
+          probek z rzedu jest sam w sobie podejrzany, niezaleznie od tego,
+          czy jego poziom mieści się w progu MAD).
+
+        Dropout wykrywany jest OSOBNO od reszty (przeszukanie biegow stalej
+        wartosci w calym s, nie tylko w punktach juz oznaczonych przez
+        anomalies()) - z prostego powodu: gdy plaski bieg jest dluzszy niz
+        okno TRM, jego SRODEK ma lokalna mediane rowna sobie samemu, wiec
+        residuum ~0 i anomalies() go NIE lapie - lapie tylko brzegi biegu
+        jako dwa osobne, pozornie niezwiazane zdarzenia. Biegi dropout,
+        ktore pokrywaja sie z takimi zdarzeniami z anomalies(), zastepuja je
+        w wyniku (zeby nie raportowac tej samej awarii dwa razy pod dwiema
+        etykietami).
+
+        Zwraca liste dictow: {start, end, duration, type, level_shift}.
+        Progi (merge_gap, revert_tol_factor, min_dropout_len) to heurystyki -
+        do skalibrowania na realnych danych z etykietami, tak jak kazdy inny
+        prog w tym projekcie.
+        """
+        t, s = self._validate(t, s)
+        n = len(t)
+
+        # --- dropout: biegi (prawie) stalej wartosci, niezaleznie od MAD ---
+        dropout_runs = []
+        i = 0
+        while i < n:
+            j = i
+            while j + 1 < n and abs(s[j + 1] - s[i]) <= dropout_eps:
+                j += 1
+            if (j - i + 1) >= min_dropout_len:
+                dropout_runs.append((i, j))
+            i = j + 1
+
+        anomaly_points, residuals, threshold = self.anomalies(t, s, factor=factor)
+
+        labeled = []
+        for a, b in dropout_runs:
+            labeled.append({
+                "start": a, "end": b, "duration": b - a + 1,
+                "type": "dropout", "level_shift": 0.0,
+            })
+
+        if len(anomaly_points) == 0:
+            return sorted(labeled, key=lambda e: e["start"])
+
+        smooth = self.trm(t, s)
+        events = []
+        start = prev = int(anomaly_points[0])
+        for idx in anomaly_points[1:]:
+            idx = int(idx)
+            if idx - prev <= merge_gap:
+                prev = idx
+                continue
+            events.append((start, prev))
+            start = prev = idx
+        events.append((start, prev))
+
+        global_std = np.std(residuals)
+        global_std = global_std if global_std > 1e-12 else 1e-9
+        revert_tol = revert_tol_factor * global_std
+
+        def overlaps_dropout(a, b):
+            return any(a <= dr_b and b >= dr_a for dr_a, dr_b in dropout_runs)
+
+        for a, b in events:
+            if overlaps_dropout(a, b):
+                continue  # juz opisane jako dropout, nie duplikuj
+            dur = b - a + 1
+            pre_lo = max(0, a - context)
+            post_hi = min(n, b + 1 + context)
+            before = np.median(smooth[pre_lo:a]) if a > pre_lo else smooth[a]
+            after = np.median(smooth[b + 1:post_hi]) if post_hi > b + 1 else smooth[b]
+            level_shift = after - before
+            seg = s[a:b + 1]
+            reverts = abs(level_shift) <= revert_tol
+
+            if dur == 1:
+                label = "impuls" if reverts else "step"
+            elif reverts:
+                label = "spike"
+            else:
+                third = max(1, dur // 3)
+                early = np.median(seg[:third])
+                late = np.median(seg[-third:])
+                gradual = abs(level_shift) > 1e-12 and abs(late - early) > 0.5 * abs(level_shift)
+                label = "drift" if (gradual and dur >= 6) else "step"
+
+            labeled.append({
+                "start": a, "end": b, "duration": dur,
+                "type": label, "level_shift": float(level_shift),
+            })
+
+        return sorted(labeled, key=lambda e: e["start"])
 
     # -----------------------------
     # FRONTS — początek wstrząsu
@@ -267,3 +489,63 @@ class TIMDR_EarthquakeCore:
         if not onsets:
             return np.empty((0, 2), dtype=np.int64)
         return np.array(onsets, dtype=np.int64)
+
+    # -----------------------------
+    # HYBRYDA TIMDR + STA/LTA — punkt 7
+    # -----------------------------
+    def hybrid_trigger(self, t, s, nsta, nlta, twist_threshold=0.4, anomaly_factor=3.0,
+                         sta_lta_thr_on=1.5, sta_lta_thr_off=0.5, tolerance=5):
+        """
+        Kazde zdarzenie z trigger_onset(sta_lta(...)) jest POTWIERDZONE
+        tylko gdy w jego sasiedztwie (+/- tolerance probek) wystepuje
+        RÓWNIEŻ silny twist (> twist_threshold) ORAZ punkt z anomalies()
+        - trzy niezalezne detektory musza sie zgodzic, zamiast polegac na
+        samym progu energii STA/LTA (ktory reaguje na kazdy wzrost energii,
+        wliczajac np. impulsowy szum nie majacy ani charakterystyki nagle
+        zmiany kierunku, ani statystycznie odstajacej amplitudy wzgledem
+        lokalnego tla).
+
+        Zwraca (confirmed, rejected):
+        - confirmed: Nx2 tablica [start,end] (jak trigger_onset), tylko
+          potwierdzone zdarzenia.
+        - rejected: lista dictow o odrzuconych kandydatach STA/LTA i
+          POWODZIE odrzucenia (missing_twist / missing_anomaly) - przydatne
+          do diagnozy, czy hybryda jest zbyt restrykcyjna.
+
+        UWAGA: to jest heurystyka redukcji false-positives z pojedynczego
+        detektora energii, NIE walidacja wzgledem katalogu prawdziwych
+        zdarzen. Czy faktycznie poprawia precision/recall (a nie tylko
+        zmniejsza liczbe alarmow kosztem realnych wykryc), trzeba sprawdzic
+        na danych z etykietami - dokladnie tak jak kazdy inny sygnal w tym
+        projekcie (patrz RAPORT_TIMDR_Finanse.md dla metodologii out-of-sample).
+        """
+        t, s = self._validate(t, s)
+        n = len(t)
+
+        flow_grad = self.flow(t, s)
+        _, twist_strength = self.twist(flow_grad, t, threshold=twist_threshold)
+        anomaly_points, _, _ = self.anomalies(t, s, factor=anomaly_factor)
+        anomaly_set = set(int(i) for i in anomaly_points)
+
+        ratio = self.sta_lta(s, nsta, nlta)
+        raw_onsets = self.trigger_onset(ratio, sta_lta_thr_on, sta_lta_thr_off)
+
+        confirmed, rejected = [], []
+        for start, end in raw_onsets:
+            lo = max(0, int(start) - tolerance)
+            hi = min(n - 1, int(end) + tolerance)
+            has_twist = bool(np.any(twist_strength[lo:hi + 1] > twist_threshold))
+            has_anomaly = any(idx in anomaly_set for idx in range(lo, hi + 1))
+            if has_twist and has_anomaly:
+                confirmed.append((int(start), int(end)))
+            else:
+                rejected.append({
+                    "start": int(start), "end": int(end),
+                    "missing_twist": not has_twist,
+                    "missing_anomaly": not has_anomaly,
+                })
+
+        confirmed_arr = (
+            np.array(confirmed, dtype=np.int64) if confirmed else np.empty((0, 2), dtype=np.int64)
+        )
+        return confirmed_arr, rejected
