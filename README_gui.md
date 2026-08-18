@@ -70,8 +70,24 @@ ustawia domyślnie `20` (czytelne dla demo), ale to nadal nie jest
 zwalidowana norma — przy własnych danych dopasuj próg patrząc na
 wartości w panelu `|twist|`.
 
+## 🐛 Poprawka: panel wykresu ucinany zamiast skalowany na węższych oknach
+
+Zgłoszone (ze zrzutem ekranu): na części ekranów prawy panel (wykresy)
+był ucięty, a nie przeskalowany. Przyczyna: `matplotlib.Figure` ma
+STAŁY rozmiar w pikselach (`figsize*dpi` = 750×850px), którego Tk canvas
+nie skaluje automatycznie przy zmianie rozmiaru okna — po prostu
+przycina to, co się nie mieści. Przy oknie węższym niż domyślne ~1220px
+(typowe przy skalowaniu DPI Windows >100% albo mniejszym ekranie) prawa
+kolumna wypadała ucięta. Naprawione: `<Configure>` na widgecie wykresu
+teraz dynamicznie woła `fig.set_size_inches()` + `canvas.draw_idle()`,
+więc wykres zawsze wypełnia dostępną przestrzeń. Zweryfikowano w
+zakresie od minimalnego rozmiaru okna (920×620) do powiększonego
+(1400×900) — rozmiar figury poprawnie nadąża za oknem w każdym
+przypadku.
+
 ## Testowanie
 
 GUI przetestowane automatycznie (Xvfb + zrzuty ekranu) na wszystkich 4
 scenariuszach demo, ze wszystkimi 3 metodami TRM preview i z hybrid
-triggerem włączonym/wyłączonym — bez wyjątków.
+triggerem włączonym/wyłączonym — bez wyjątków, oraz na 4 różnych
+rozmiarach okna po poprawce resize.

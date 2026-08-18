@@ -61,6 +61,35 @@ Domyślne zachowanie istniejących metod (`flow`, `twist`, `trm()` bez
 `method=`, `anomalies`, `fronts`, `sta_lta`, `trigger_onset`) się nie
 zmieniło — wszystkie dotychczasowe testy przechodzą bez modyfikacji.
 
+## Topology(t) / "Rezonans TIMDR" — test predykcyjności
+
+Osobny wątek dyskusji zaproponował `R(t) = |Flow|·|Twist|·|Defect|·Topology`
+jako "punkt zapłonu zdarzenia" z zapowiadaną predykcją. `Topology(t)`
+zostało zoperacjonalizowane uczciwie — `topology_features.py`, sliding-window
+(delay) embedding + homologia uporczywa Vietoris-Rips (`gudhi`), metoda
+SW1PerS (Perea & Harer 2015), nie ad hoc metryka. Parametry embeddingu
+zamrożone na syntetycznym sanity-checku (sinus/szum/trend) PRZED
+policzeniem czegokolwiek na tym repo, żeby uniknąć data snoopingu.
+
+Test w `analyze_topology_resonance_seismic.py`: czy `R(t)`/`Topology(t)`,
+liczone WYŁĄCZNIE z danych sprzed etykietowanego początku zdarzenia,
+podnosi się w oknie tuż PRZED startem wstrząsu bardziej niż w losowych
+oknach z tła (jedyne pytanie, które faktycznie znaczyłoby "predykcja" w
+tym kontekście — `fronts()`/`hybrid_trigger()` już wykrywają zdarzenie,
+które się zaczęło, to nie jest to samo).
+
+Wynik: **nie**. `R(t)` jest matematycznie zdegenerowany (iloczyn czterech
+już rzadkich wskaźników koliduje w ~0 niemal wszędzie). Sama `Topology(t)`
+nie jest podwyższona przed startem ani na nagłym wstrząsie (41.5 percentyl
+względem tła), ani na stopniowym dryfie (34.3 percentyl) — w obu
+przypadkach poniżej mediany tła, nie powyżej. Kontrola negatywna (czysty
+szum, brak zdarzenia) nie dała fałszywego alarmu. Pełny wynik:
+`topology_resonance_seismic_output.txt`. Ten sam test na realnych danych
+BTC/złota (`timdr-finanse/analyze_topology_resonance.py`) dał ten sam
+werdykt — `R(t)` zdegenerowany, `Topology(t)` bez trwałego sygnału
+out-of-sample (na złocie znak korelacji odwraca się między treningiem a
+testem).
+
 ## Przykład użycia
 
 ```python
@@ -82,5 +111,5 @@ confirmed, rejected = core.hybrid_trigger(t, s, nsta=50, nlta=500)
 
 ## Testy
 
-`pytest -q` — 33 przechodzi + 1 pomijany bez ObsPy
+`pytest -q` — 35 przechodzi + 1 pomijany bez ObsPy
 (`test_sta_lta_i_trigger_onset_zgodne_z_obspy`).
