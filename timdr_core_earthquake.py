@@ -269,7 +269,7 @@ class TIMDR_EarthquakeCore:
     # -----------------------------
     def classify_anomalies(self, t, s, factor=3.0, merge_gap=3, context=5,
                              revert_tol_factor=1.5, min_dropout_len=5,
-                             dropout_eps=1e-9):
+                             dropout_eps=None, dropout_diff_frac=0.05):
         """
         Grupuje punkty z anomalies() w zdarzenia (sasiednie indeksy w
         odleglosci <= merge_gap sa jednym zdarzeniem) i kwalifikuje KSZTALT
@@ -286,37 +286,57 @@ class TIMDR_EarthquakeCore:
           bez wyraznego stopniowego narastania w trakcie zdarzenia.
         - "drift":  jak step, ale zmiana narasta stopniowo w trakcie
           zdarzenia (monotoniczny trend), a nie skokiem na starcie.
-        - "dropout": dlugi biep (>= min_dropout_len probek) PRAKTYCZNIE
-          IDENTYCZNYCH wartosci - typowe dla utknietego czujnika/telemetrii,
-          nie realnego ruchu gruntu (ktory prawie zawsze ma jakis szum tla;
-          realny sygnal powtarzajacy dokladnie ta sama wartosc przez wiele
-          probek z rzedu jest sam w sobie podejrzany, niezaleznie od tego,
-          czy jego poziom mieści się w progu MAD).
+        - "dropout": dlugi bieg (>= min_dropout_len probek) o KROKACH
+          MIEDZY SASIEDNIMI PROBKAMI dużo mniejszych niz typowy krok szumu
+          w reszcie sygnalu - typowe dla utknietego czujnika/telemetrii,
+          nie realnego ruchu gruntu (ktory prawie zawsze ma jakis szum tla,
+          wiec kolejne probki realnie sie od siebie roznia).
 
-        Dropout wykrywany jest OSOBNO od reszty (przeszukanie biegow stalej
-        wartosci w calym s, nie tylko w punktach juz oznaczonych przez
-        anomalies()) - z prostego powodu: gdy plaski bieg jest dluzszy niz
-        okno TRM, jego SRODEK ma lokalna mediane rowna sobie samemu, wiec
-        residuum ~0 i anomalies() go NIE lapie - lapie tylko brzegi biegu
-        jako dwa osobne, pozornie niezwiazane zdarzenia. Biegi dropout,
-        ktore pokrywaja sie z takimi zdarzeniami z anomalies(), zastepuja je
-        w wyniku (zeby nie raportowac tej samej awarii dwa razy pod dwiema
+        Dropout wykrywany jest OSOBNO od reszty (przeszukanie biegow w
+        calym s, nie tylko w punktach juz oznaczonych przez anomalies()) -
+        z prostego powodu: gdy plaski bieg jest dluzszy niz okno TRM, jego
+        SRODEK ma lokalna mediane rowna sobie samemu, wiec residuum ~0 i
+        anomalies() go NIE lapie - lapie tylko brzegi biegu jako dwa
+        osobne, pozornie niezwiazane zdarzenia. Biegi dropout, ktore
+        pokrywaja sie z takimi zdarzeniami z anomalies(), zastepuja je w
+        wyniku (zeby nie raportowac tej samej awarii dwa razy pod dwiema
         etykietami).
 
+        UWAGA: prog "stalosci" (dropout_eps) porownuje kroki MIEDZY
+        SASIEDNIMI probkami (nie odleglosc od poczatku biegu), skalowany
+        wzgledem typowego |diff| w calym sygnale (dropout_diff_frac=0.05
+        domyslnie). To celowo NIE jest test "dokladnie ta sama wartosc" -
+        preprocessing typu detrend (patrz SeismicLoader) odejmuje globalny
+        trend liniowy, wiec idealnie staly odczyt czujnika po detrendzie
+        dostaje maly, ale STALY spadek/wzrost między kolejnymi probkami
+        zamiast byc dokladnie identyczny. Test na krok miedzy sasiadami
+        (a nie na odleglosc od pierwszej probki biegu) toleruje taki
+        liniowy dryf, jednoczesnie zostajac duzo czulszym niz realny szum
+        tla (ktorego typowy krok jest rzedy wielkosci wiekszy).
+
         Zwraca liste dictow: {start, end, duration, type, level_shift}.
-        Progi (merge_gap, revert_tol_factor, min_dropout_len) to heurystyki -
-        do skalibrowania na realnych danych z etykietami, tak jak kazdy inny
-        prog w tym projekcie.
+        Progi (merge_gap, revert_tol_factor, min_dropout_len,
+        dropout_diff_frac) to heurystyki - do skalibrowania na realnych
+        danych z etykietami, tak jak kazdy inny prog w tym projekcie.
         """
         t, s = self._validate(t, s)
         n = len(t)
 
-        # --- dropout: biegi (prawie) stalej wartosci, niezaleznie od MAD ---
+        # --- dropout: biegi o prawie stalym kroku miedzy sasiadami,
+        # niezaleznie od MAD (patrz uwaga w docstringu wyzej) ---
+        if dropout_eps is None:
+            diffs_all = np.abs(np.diff(s))
+            typical_diff = np.median(diffs_all) if len(diffs_all) else 0.0
+            if typical_diff <= 1e-12:
+                std_s = np.std(s)
+                typical_diff = std_s if std_s > 1e-12 else 1e-9
+            dropout_eps = max(dropout_diff_frac * typical_diff, 1e-12)
+
         dropout_runs = []
         i = 0
         while i < n:
             j = i
-            while j + 1 < n and abs(s[j + 1] - s[i]) <= dropout_eps:
+            while j + 1 < n and abs(s[j + 1] - s[j]) <= dropout_eps:
                 j += 1
             if (j - i + 1) >= min_dropout_len:
                 dropout_runs.append((i, j))

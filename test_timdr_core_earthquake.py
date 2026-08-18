@@ -330,6 +330,40 @@ def test_classify_anomalies_wykrywa_dropout(core):
     assert any(e["type"] == "dropout" for e in events)
 
 
+def test_classify_anomalies_wykrywa_dropout_po_liniowym_dryfie(core):
+    """Regresja: SeismicLoader.detrend() odejmuje globalny trend liniowy,
+    wiec idealnie staly odczyt czujnika PO detrendzie nie jest juz
+    dokladnie identyczny probka-po-probce, tylko ma maly, stary
+    (w przyblizeniu staly) spadek/wzrost. Test na dokladna rownosc
+    (stary dropout_eps=1e-9 wzgledem pierwszej probki biegu) go gubil -
+    znalezione przy testowaniu GUI na scenariuszu 'Stuck sensor', gdzie
+    demo_dropout() + SeismicLoader(detrend=True) dawalo 0 wykrytych
+    dropoutow zamiast oczekiwanego jednego."""
+    rng = np.random.default_rng(15)
+    n = 200
+    t = np.arange(n) * 0.01
+    s = rng.normal(0, 0.5, n)
+    # symulacja stuck-sensor + globalny detrend: staly poziom 5.0 ze
+    # SLABYM, STALYM sciekiem liniowym (jak po odjeciu trendu), a NIE
+    # dokladnie identyczne probki
+    ramp = np.linspace(0, -0.01, 15)
+    s[100:115] = 5.0 + ramp
+    events = core.classify_anomalies(t, s)
+    assert any(e["type"] == "dropout" and e["start"] <= 100 <= e["end"] + 5 for e in events)
+
+
+def test_classify_anomalies_brak_falszywego_dropoutu_na_realnym_szumie(core):
+    """Prawdziwy szum tla (nawet o malej amplitudzie) NIE powinien
+    wygenerowac dropoutu - kroki miedzy sasiadami sa tam duzo wieksze niz
+    (relatywny) prog dropout_diff_frac."""
+    rng = np.random.default_rng(16)
+    n = 500
+    t = np.arange(n) * 0.01
+    s = rng.normal(0, 0.05, n)
+    events = core.classify_anomalies(t, s)
+    assert all(e["type"] != "dropout" for e in events)
+
+
 # ============================================================
 # hybrid_trigger — punkt 7
 # ============================================================
