@@ -180,40 +180,6 @@ next_idx, dt = cat.nearest_aftershock(t, magnitude)
 Uruchomienie: `python demo_usgs_catalog.py` (instrukcja odświeżenia
 danych live na aktualny katalog USGS w nagłówku pliku).
 
-## 🆕 Scenariusz "synoptyka" — na ile prognozowanie jest w ogóle możliwe?
-
-Osobny test (folder [`synoptyk-analiza/`](synoptyk-analiza/), pełny kod +
-dane + wykresy w `synoptyk-analiza/deliverable.zip`): sprawdzone na
-realnych, żywych danych USGS (nie syntetycznych), zawsze kauzalnie
-(prognoza w chwili D używa wyłącznie danych sprzed D).
-
-**Test 1 — sekwencja Ridgecrest 2019** (M4.0+, 102 zdarzenia, mainshock
-M7.1): prawo Omori-Utsu dopasowane kauzalnie do prognozy liczby
-wstrząsów wtórnych dało średni błąd **2.6 zdarzenia** — wobec **32.2**
-dla stałego tła Poissona i **12.3** dla naiwnej ekstrapolacji ostatnich
-24h. Krótkoterminowe prognozowanie aftershocków *działa* i daje
-policzalną przewagę (to ta sama rodzina modeli, której USGS używa
-operacyjnie w swoim "Aftershock Forecast").
-
-**Test 2 — katalog globalny M6.3+, 2016-2026** (699 zdarzeń,
-zweryfikowane 1:1 z licznikiem `fdsnws/event/1/count`): `trend_z` z
-`catalog_core.trend()` miał korelację **r=0.04** (szum) z faktyczną
-przyszłą aktywnością w kolejnych 30 dniach; prognoza z tempa ostatnich
-90 dni wypadła *gorzej* niż zwykła stała średnia historyczna (MAE 2.67
-vs 2.37), a dla progu M7.0+ Brier score Poissona (0.31) był gorszy niż
-"zawsze ta sama" prognoza bazowa (0.24). Bez trwającej sekwencji żaden
-testowany sygnał nie bije zwykłej stałej częstości bazowej — zgodnie z
-konsensusem sejsmologicznym, że w dużej skali trzęsienia ziemi
-zachowują się w przybliżeniu bezpamięciowo (proces Poissona).
-
-**Wniosek:** "synoptyk" ma sens jako krótkoterminowa, probabilistyczna
-prognoza aftershocków tuż po dużym wstrząsie (Test 1) — ale nie jako
-ogólne "kiedy/gdzie uderzy następne duże trzęsienie" bez informacji o
-trwającej sekwencji (Test 2). `anomalies()` i `rhythm()` z
-`catalog_core.py` dalej działają poprawnie jako narzędzia
-*diagnostyczne* (opis tego, co już się wydarzyło), nie jako
-prognostyczne.
-
 ## Przykład użycia
 
 ```python
@@ -228,3 +194,63 @@ fronts, _, _ = core.fronts(t, s)
 ```
 
 Uruchomienie: `python demo.py` / testy: `pytest -q`.
+
+## Cztery dodatki (bez zmiany domyślnego zachowania istniejących metod)
+
+Po przeglądzie kodu padła propozycja siedmiu usprawnień, w tym modułu
+"interpretacji fizycznej" mapującego flow/twist/rhythm na
+EARTHQUAKE/BLAST/NOISE/MINING/TECTONIC. Ten moduł **celowo nie
+powstał** — pojedynczy kanał amplitudy `s(t)` nie niesie informacji
+potrzebnej do takiego rozróżnienia (P vs S wymaga polaryzacji/3
+składowych, trzęsienie vs wybuch klasycznie rozróżnia się widmowo,
+np. Pn/Lg, plus głębokość/czas trwania) — nazwanie kategorii
+prawdziwymi terminami sejsmologicznymi nie tworzy między nimi mostu
+fizycznego. Zaimplementowane zostały cztery pozostałe, które da się
+uczciwie policzyć z samego `s(t)`:
+
+- **Szybszy `flow()`/`trm()`** — KDTree per-punkt zastąpiony helperem
+  `_nearest_k_bounds()`: skoro `t` jest ściśle rosnące, k najbliższych
+  sąsiadów po czasie zawsze tworzy ciągły przedział indeksów wokół `i`,
+  więc wystarczy dwuwskaźnikowe rozszerzanie okna zamiast budowy
+  drzewa. Zweryfikowano identyczność z KDTree (0 rozbieżności na 80
+  próbkach z przerwą w rejestracji) i przyspieszenie ~2.5x na n=20000.
+  Uwaga: to NIE jest sztywne okno po indeksie `[i-k:i+k]` (taka wersja
+  zepsułaby się dokładnie tam, gdzie `twist()` już raz naprawił błąd z
+  przerwą w telemetrii) — sąsiedztwo liczone jest po realnej
+  odległości w `t`.
+- **`trm(..., method="adaptive"/"savgol")`** — obok domyślnej mediany
+  k-NN: `"adaptive"` skaluje rozmiar okna odwrotnie do lokalnej
+  zmienności (mniejsze okno tam, gdzie dzieje się coś realnego, żeby
+  mediana nie "usztywniała" skoku; większe w spokojnym tle, dla
+  mocniejszego wygładzenia szumu); `"savgol"` to filtr
+  Savitzky-Golay jako alternatywa lepiej zachowująca kształt zbocza
+  (zakłada w przybliżeniu równomierne próbkowanie — nie używać przy
+  danych z lukami czasowymi).
+- **`classify_anomalies(t, s)`** — grupuje sąsiednie punkty z
+  `anomalies()` w zdarzenia i opisuje ich KSZTAŁT (nie typ fizyczny):
+  `impuls` (pojedyncza próbka, wraca), `spike` (krótki wybuch, wraca),
+  `step` (trwały skok poziomu), `drift` (poziom narasta stopniowo, nie
+  skokiem), `dropout` (długi bieg praktycznie identycznych wartości —
+  typowe dla utkniętego czujnika, wykrywane niezależnie od progu MAD,
+  bo środek długiego płaskiego biegu ma lokalną medianę równą sobie
+  samemu i `anomalies()` go nie łapie).
+- **`hybrid_trigger(t, s, nsta, nlta)`** — zdarzenie z
+  `trigger_onset(sta_lta(...))` jest potwierdzone tylko, gdy w jego
+  sąsiedztwie występuje też silny `twist` ORAZ punkt z `anomalies()`;
+  bez tego trafia do listy `rejected` z podanym powodem
+  (`missing_twist`/`missing_anomaly`). To ogranicza false positives
+  samego STA/LTA (reaguje na każdy wzrost energii), ale **nie jest to
+  zwalidowane względem katalogu prawdziwych zdarzeń** — czy to
+  faktycznie poprawia precision/recall, a nie tylko obcina też
+  prawdziwe wykrycia, wymaga testu na danych z etykietami, tak jak
+  każdy inny próg w tym projekcie.
+
+```python
+smooth_adapt = core.trm(t, s, method="adaptive")
+smooth_sg = core.trm(t, s, method="savgol", window_length=11, polyorder=3)
+events = core.classify_anomalies(t, s)          # [{'start','end','duration','type','level_shift'}, ...]
+confirmed, rejected = core.hybrid_trigger(t, s, nsta=50, nlta=500)
+```
+
+33 nowe/zaktualizowane testy w `test_timdr_core_earthquake.py` (razem
+34, 1 pomijany bez ObsPy) — `pytest -q`.
