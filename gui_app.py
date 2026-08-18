@@ -349,9 +349,36 @@ class TimdrEarthquakeGUI(tk.Tk):
         self._draw_placeholder()
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
-        self.canvas.get_tk_widget().pack(fill="both", expand=True)
+        canvas_widget = self.canvas.get_tk_widget()
+        canvas_widget.pack(fill="both", expand=True)
         toolbar = NavigationToolbar2Tk(self.canvas, plot_frame)
         toolbar.update()
+
+        # Bez tego Figure ma STALY rozmiar w px (figsize*dpi) - Tk canvas
+        # go NIE skaluje przy zmianie rozmiaru okna, tylko PRZYCINA, gdy
+        # dostepna szerokosc/wysokosc jest mniejsza niz domyslne 750x850px
+        # (typowe przy skalowaniu DPI Windows >100% albo mniejszym ekranie
+        # niz zakladane 1220x780 - dokladnie zgloszony problem: "ucina
+        # komorki w tabeli po prawej"). Debounce (after) bo <Configure>
+        # odpala sie wielokrotnie w trakcie przeciagania krawedzi okna.
+        self._resize_job = None
+        canvas_widget.bind("<Configure>", self._on_plot_resize)
+
+    def _on_plot_resize(self, event):
+        if self._resize_job is not None:
+            self.after_cancel(self._resize_job)
+        self._resize_job = self.after(120, lambda w=event.width, h=event.height: self._apply_plot_resize(w, h))
+
+    def _apply_plot_resize(self, width, height):
+        self._resize_job = None
+        if width < 100 or height < 100:
+            return
+        dpi = self.fig.get_dpi()
+        new_w, new_h = width / dpi, height / dpi
+        if abs(new_w - self.fig.get_figwidth()) < 0.05 and abs(new_h - self.fig.get_figheight()) < 0.05:
+            return
+        self.fig.set_size_inches(new_w, new_h)
+        self.canvas.draw_idle()
 
     def _draw_placeholder(self):
         titles = ["signal", "flow (local gradient)", "|twist|", "residual + anomalies/fronts",
