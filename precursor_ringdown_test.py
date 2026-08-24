@@ -417,7 +417,7 @@ def fetch_window(client, station: dict, center_time, hours_before: float, hours_
 
 
 def run_real_test(min_magnitude: float, years: int, n_background: int, max_pre_events: int,
-                   waveform_timeout: float = 20.0) -> dict:
+                   waveform_timeout: float = 20.0, bg_time_budget_s: float = 240.0) -> dict:
     import random
     import time
     from scipy.stats import mannwhitneyu
@@ -473,19 +473,35 @@ def run_real_test(min_magnitude: float, years: int, n_background: int, max_pre_e
         pre_meta.append({"event_id": ev["id"], "station": station["sta"], **feat})
         print(f"OK (frac_oscillatory={feat['frac_oscillatory']:.3f}, n_candidates={feat['n_candidates']})")
 
-    print(f"[3/4] Licze cechy TLA dla {n_background} losowych okien (kazde z wlasnym, waskim zapytaniem wykluczajacym)...")
+    print(f"[3/4] Licze cechy TLA dla max {n_background} losowych okien "
+          f"(twardy budzet czasu: {bg_time_budget_s:.0f}s - patrz --background-time-budget-s)...")
     rng = random.Random(42)
     bg_features, bg_meta, attempts = [], [], 0
     t_start = time.time()
-    while len(bg_features) < n_background and attempts < n_background * 20:
+    # TWARDY BUDZET CZASU (naprawiony problem: uzytkownik zatrzymal ten
+    # krok recznie, bo "liczy bardzo dlugo, nie wiem dokad" - poprzednia
+    # wersja miala tylko miekki limit prob (n_background*20 = az 1200),
+    # bez zadnego ograniczenia CZASU, wiec przy niskim odsetku sukcesu
+    # (np. gdy wiele losowych stacji/czasow trafia w braki danych na
+    # EarthScope) krok mogl teoretycznie trwac bardzo dlugo bez zadnej
+    # zapowiadanej granicy - nawet przy widocznym postepie kazdej proby,
+    # calkowity czas byl nieprzewidywalny. Teraz: petla zatrzymuje sie
+    # NAJPOZNIEJ po uplywie bg_time_budget_s, z tym co udalo sie zebrac
+    # do tego momentu (nadal wymagane >=5 okien do samego testu
+    # statystycznego, patrz nizej) - uczciwie raportowane w wyniku jako
+    # `background_time_budget_hit`.
+    while (len(bg_features) < n_background
+           and attempts < n_background * 20
+           and (time.time() - t_start) < bg_time_budget_s):
         attempts += 1
         station = rng.choice(RELIABLE_STATIONS)
         candidate = start + timedelta(seconds=rng.uniform(0, (end - start).total_seconds()))
         elapsed = time.time() - t_start
-        print(f"      [{len(bg_features)+1}/{n_background}, proba {attempts}] {candidate.date()} ({station['sta']}) - {elapsed:.0f}s uplynelo...", end=" ", flush=True)
+        print(f"      [{len(bg_features)+1}/{n_background}, proba {attempts}, {elapsed:.0f}/{bg_time_budget_s:.0f}s] "
+              f"{candidate.date()} ({station['sta']})...", end=" ", flush=True)
         try:
             if has_nearby_significant_event(candidate, EXCLUSION_DAYS, station):
-                print("pominieto (blisko M>=4.5)")
+                print("pominieto (blisko M>=4.5 w promieniu stacji)")
                 continue
         except Exception as e:
             print(f"pominieto sprawdzenie wykluczenia ({type(e).__name__}: {e})")
@@ -499,6 +515,11 @@ def run_real_test(min_magnitude: float, years: int, n_background: int, max_pre_e
         bg_features.append(feat["frac_oscillatory"])
         bg_meta.append({"station": station["sta"], "time": candidate.isoformat(), **feat})
         print(f"OK (frac_oscillatory={feat['frac_oscillatory']:.3f}, n_candidates={feat['n_candidates']})")
+
+    time_budget_hit = (time.time() - t_start) >= bg_time_budget_s and len(bg_features) < n_background
+    if time_budget_hit:
+        print(f"      (budzet czasu {bg_time_budget_s:.0f}s wyczerpany - uzyto {len(bg_features)}/{n_background} "
+              f"okien tla zebranych do tego momentu, nie wszystkie {n_background})")
 
     print(f"      -> {len(pre_features)} okien pre-event, {len(bg_features)} okien tla")
     if len(pre_features) < 5 or len(bg_features) < 5:
@@ -515,6 +536,7 @@ def run_real_test(min_magnitude: float, years: int, n_background: int, max_pre_e
         "mannwhitney_p_value": float(p_value),
         "significant_at_0_05": bool(p_value < 0.05),
         "pre_event_higher_than_background": bool(np.mean(pre_features) > np.mean(bg_features)),
+        "background_time_budget_hit": bool(time_budget_hit),
         "pre_event_details": pre_meta,
         "background_details": bg_meta,
     }
@@ -531,6 +553,8 @@ def main():
                      help="losowa probka (seed=7) z katalogu pre-event, dla przewidywalnego czasu dzialania (0 = bez limitu, wszystkie zdarzenia z katalogu)")
     ap.add_argument("--waveform-timeout", type=float, default=20.0,
                      help="timeout (s) na pojedyncze zapytanie o fale sejsmiczne do EarthScope/IRIS")
+    ap.add_argument("--background-time-budget-s", type=float, default=240.0,
+                     help="twardy limit czasu (s) na caly krok liczenia okien tla [3/4] - zatrzymuje sie z tym, co udalo sie zebrac, zamiast dzialac bez przewidywalnej granicy")
     ap.add_argument("--out", default="precursor_ringdown_test_output.json")
     args = ap.parse_args()
 
@@ -560,7 +584,8 @@ def main():
         print("=" * 70)
         try:
             real = run_real_test(args.min_magnitude, args.years, args.n_background,
-                                  args.max_pre_events, args.waveform_timeout)
+                                  args.max_pre_events, args.waveform_timeout,
+                                  args.background_time_budget_s)
         except Exception as e:
             print(f"\nBLAD podczas testu na realnych danych: {type(e).__name__}: {e}")
             print("(Jesli katalog USGS w kroku [1/4] pobral sie poprawnie, dostep do")
