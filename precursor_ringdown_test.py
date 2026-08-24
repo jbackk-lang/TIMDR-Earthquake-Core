@@ -339,37 +339,65 @@ def fetch_usgs_catalog(min_magnitude: float, start: datetime, end: datetime) -> 
     return events
 
 
-def usgs_event_count(min_magnitude: float, start: datetime, end: datetime) -> int:
+BACKGROUND_EXCLUSION_RADIUS_KM = 1000  # patrz docstring has_nearby_significant_event
+
+
+def usgs_event_count(min_magnitude: float, start: datetime, end: datetime,
+                      lat: float | None = None, lon: float | None = None,
+                      max_radius_km: float | None = None) -> int:
     """Lekki endpoint /count - zwraca sama liczbe zdarzen bez ich tresci.
-    Uzywany do sprawdzania okien tla BEZ pobierania calego katalogu."""
+    Uzywany do sprawdzania okien tla BEZ pobierania calego katalogu.
+    Jesli podano lat/lon/max_radius_km, zapytanie jest ograniczone do
+    kola o tym promieniu (patrz has_nearby_significant_event)."""
     url = (
         "https://earthquake.usgs.gov/fdsnws/event/1/count"
         f"?starttime={start.strftime('%Y-%m-%dT%H:%M:%S')}"
         f"&endtime={end.strftime('%Y-%m-%dT%H:%M:%S')}"
         f"&minmagnitude={min_magnitude}"
     )
+    if lat is not None and lon is not None and max_radius_km is not None:
+        url += f"&latitude={lat}&longitude={lon}&maxradiuskm={max_radius_km}"
     r = _get_usgs_session().get(url, timeout=30)
     r.raise_for_status()
     return int(r.text.strip())
 
 
-def has_nearby_significant_event(candidate: datetime, days: int, min_magnitude: float = 4.5) -> bool:
-    """ZNALEZIONY I NAPRAWIONY BLAD (podczas pierwszego uruchomienia
-    --mode real na prawdziwej sieci): pierwotna wersja pobierala CALY
-    globalny katalog M>=4.5 z calego okresu (np. 5 lat) NA RAZ, zeby
-    pozniej sprawdzac przynaleznosc kazdego kandydata do niego lokalnie.
-    Dla min_magnitude=4.5 x 5 lat to 38062 zdarzenia - POWYZEJ limitu
-    USGS FDSN (20000 wynikow/zapytanie), co dawalo `HTTPError: 400 Bad
-    Request` przy KAZDYM uruchomieniu, niezaleznie od jakosci polaczenia
-    sieciowego (to nie byl blad sieci, tylko zle sformulowane zapytanie).
-    Naprawiono: zamiast jednego ogromnego zapytania, KAZDY kandydat na
-    tlo dostaje wlasne, WASKIE zapytanie (tylko +/- `days` dni wokol
-    niego) - kazde takie zapytanie jest male i nigdy nie zblizy sie do
-    limitu 20000, niezaleznie od tego, jak dlugi jest cala testowany
-    okres."""
+def has_nearby_significant_event(candidate: datetime, days: int, station: dict,
+                                  min_magnitude: float = 4.5,
+                                  radius_km: float = BACKGROUND_EXCLUSION_RADIUS_KM) -> bool:
+    """DWA ZNALEZIONE I NAPRAWIONE BLEDY (oba wykryte dopiero przy
+    uruchomieniu --mode real na prawdziwej sieci - zaden nie ujawnil sie
+    w trybie syntetycznym, bo tam nie ma prawdziwego katalogu USGS):
+
+    1) Pierwotna wersja pobierala CALY globalny katalog M>=4.5 z calego
+       okresu (np. 5 lat) NA RAZ. Dla min_magnitude=4.5 x 5 lat to 38062
+       zdarzenia - POWYZEJ limitu USGS FDSN (20000 wynikow/zapytanie) ->
+       `HTTPError: 400 Bad Request`. Naprawiono (poprzedni commit):
+       kazdy kandydat dostaje wlasne, waskie zapytanie czasowe.
+
+    2) TEN blad (nowszy, wazniejszy fizycznie): to waskie-czasowe
+       zapytanie nadal bylo GLOBALNE geograficznie (bez ograniczenia
+       lat/lon) - sprawdzalo, czy GDZIEKOLWIEK NA ZIEMI byl M>=4.5 w
+       ciagu +/-3 dni od kandydata. Globalnie zdarza sie kilka M>=4.5
+       DZIENNIE (rzad wielkosci: 1500-2000/rok), wiec w oknie 7-dniowym
+       (+/-3 dni) PRAWIE ZAWSZE cos sie gdzies wydarzy - w praktyce
+       kandydat byl odrzucany niemal za kazdym razem (zaobserwowane:
+       35+ z rzedu odrzuconych na pierwszej probie tla). Wymaganie
+       'cisza sejsmiczna na calym globie' jest niewykonalne i tez nie
+       jest tym, co fizycznie ma znaczenie - liczy sie, czy stacja
+       ZAREJESTROWALA COS ISTOTNEGO W POBLIZU, nie czy Ziemia gdziekolwiek
+       byla akurat calkiem cicha.
+       Naprawiono: zapytanie ograniczone geograficznie do kola o
+       promieniu `radius_km` (domyslnie 1000km) WOKOL STACJI, ktora ma
+       nagrac to okno tla - odzwierciedla realne kryterium 'ten
+       konkretny odczyt nie jest zanieczyszczony bliskim, istotnym
+       wstrzasem', zamiast niemozliwego do spelnienia 'nigdzie na Ziemi
+       nic sie nie dzieje'."""
     start = candidate - timedelta(days=days)
     end = candidate + timedelta(days=days)
-    return usgs_event_count(min_magnitude, start, end) > 0
+    return usgs_event_count(min_magnitude, start, end,
+                             lat=station["lat"], lon=station["lon"],
+                             max_radius_km=radius_km) > 0
 
 
 def fetch_window(client, station: dict, center_time, hours_before: float, hours_after: float):
@@ -388,57 +416,110 @@ def fetch_window(client, station: dict, center_time, hours_before: float, hours_
     return t, s
 
 
-def run_real_test(min_magnitude: float, years: int, n_background: int) -> dict:
+def run_real_test(min_magnitude: float, years: int, n_background: int, max_pre_events: int,
+                   waveform_timeout: float = 20.0, bg_time_budget_s: float = 240.0) -> dict:
     import random
+    import time
     from scipy.stats import mannwhitneyu
     from obspy.clients.fdsn import Client
 
     end = datetime.now(timezone.utc)
     start = end - timedelta(days=365 * years)
 
-    print(f"[1/5] Pobieram realny katalog USGS (M>={min_magnitude}, {years} lat)...")
+    print(f"[1/4] Pobieram realny katalog USGS (M>={min_magnitude}, {years} lat)...")
     events = fetch_usgs_catalog(min_magnitude, start, end)
     print(f"      -> {len(events)} zdarzen")
     if not events:
         raise RuntimeError("Katalog USGS pusty dla podanych parametrow - nie ma czego testowac.")
 
-    client = Client("EARTHSCOPE")
+    # ZNALEZIONY PROBLEM (przy pierwszym uruchomieniu przez uzytkownika na
+    # prawdziwej sieci): przy 205 zdarzeniach skrypt "wygladal na
+    # zawieszony" - w rzeczywistosci po prostu wolno, SEKWENCYJNIE
+    # sciagal fale sejsmiczne (kazda proba to osobne zapytanie sieciowe
+    # do EarthScope, bez zadnego printu postepu miedzy nimi, wiec konsola
+    # stala pusta przez minuty). Naprawiono dwoma rzeczami:
+    # (1) jawny, krotki timeout na kliencie ObsPy (default: 20s) - bez
+    #     tego pojedyncze zawieszone/wolne zadanie moglo blokowac caly
+    #     skrypt na dlugo (domyslny timeout ObsPy to najczesciej minuty).
+    # (2) widoczny, flushowany print postepu PRZY KAZDYM zdarzeniu -
+    #     zeby bylo jasne, ze skrypt dziala, a nie stoi w miejscu.
+    # (3) `--max-pre-events` - losowa (ale ustalona seedem, wiec
+    #     powtarzalna) probka z katalogu zamiast wszystkich zdarzen, zeby
+    #     czas dzialania byl z gory ograniczony i przewidywalny. Domyslnie
+    #     40 - mozna podniesc `--max-pre-events 0` = bez limitu.
+    if max_pre_events and len(events) > max_pre_events:
+        sample_rng = random.Random(7)
+        events = sample_rng.sample(events, max_pre_events)
+        print(f"      (probka {max_pre_events} z {len(events)}+ zdarzen, seed=7, dla przewidywalnego czasu dzialania - patrz --max-pre-events)")
+
+    client = Client("EARTHSCOPE", timeout=waveform_timeout)
     core = TIMDR_EarthquakeCore()
 
-    print(f"[2/4] Licze cechy PRE-EVENT dla {len(events)} realnych wstrzasow...")
+    print(f"[2/4] Licze cechy PRE-EVENT dla {len(events)} realnych wstrzasow (timeout={waveform_timeout}s/zapytanie)...")
     pre_features, pre_meta = [], []
-    for ev in events:
+    t_start = time.time()
+    for i, ev in enumerate(events):
         station = nearest_station(ev["lat"], ev["lon"])
         window_end = ev["time"] - timedelta(hours=LEAD_HOURS)
+        elapsed = time.time() - t_start
+        print(f"      [{i+1}/{len(events)}] {ev['id']} ({station['sta']}, M{ev['mag']}) - {elapsed:.0f}s uplynelo...", end=" ", flush=True)
         try:
             t, s = fetch_window(client, station, window_end, WINDOW_HOURS, 0.0)
         except Exception as e:
-            print(f"      pominieto {ev['id']} ({station['sta']}): {e}")
+            print(f"pominieto ({type(e).__name__}: {e})")
             continue
         feat = ringdown_window_feature(t, s, core)
         pre_features.append(feat["frac_oscillatory"])
         pre_meta.append({"event_id": ev["id"], "station": station["sta"], **feat})
+        print(f"OK (frac_oscillatory={feat['frac_oscillatory']:.3f}, n_candidates={feat['n_candidates']})")
 
-    print(f"[3/4] Licze cechy TLA dla {n_background} losowych okien (kazde z wlasnym, waskim zapytaniem wykluczajacym)...")
+    print(f"[3/4] Licze cechy TLA dla max {n_background} losowych okien "
+          f"(twardy budzet czasu: {bg_time_budget_s:.0f}s - patrz --background-time-budget-s)...")
     rng = random.Random(42)
     bg_features, bg_meta, attempts = [], [], 0
-    while len(bg_features) < n_background and attempts < n_background * 20:
+    t_start = time.time()
+    # TWARDY BUDZET CZASU (naprawiony problem: uzytkownik zatrzymal ten
+    # krok recznie, bo "liczy bardzo dlugo, nie wiem dokad" - poprzednia
+    # wersja miala tylko miekki limit prob (n_background*20 = az 1200),
+    # bez zadnego ograniczenia CZASU, wiec przy niskim odsetku sukcesu
+    # (np. gdy wiele losowych stacji/czasow trafia w braki danych na
+    # EarthScope) krok mogl teoretycznie trwac bardzo dlugo bez zadnej
+    # zapowiadanej granicy - nawet przy widocznym postepie kazdej proby,
+    # calkowity czas byl nieprzewidywalny. Teraz: petla zatrzymuje sie
+    # NAJPOZNIEJ po uplywie bg_time_budget_s, z tym co udalo sie zebrac
+    # do tego momentu (nadal wymagane >=5 okien do samego testu
+    # statystycznego, patrz nizej) - uczciwie raportowane w wyniku jako
+    # `background_time_budget_hit`.
+    while (len(bg_features) < n_background
+           and attempts < n_background * 20
+           and (time.time() - t_start) < bg_time_budget_s):
         attempts += 1
         station = rng.choice(RELIABLE_STATIONS)
         candidate = start + timedelta(seconds=rng.uniform(0, (end - start).total_seconds()))
+        elapsed = time.time() - t_start
+        print(f"      [{len(bg_features)+1}/{n_background}, proba {attempts}, {elapsed:.0f}/{bg_time_budget_s:.0f}s] "
+              f"{candidate.date()} ({station['sta']})...", end=" ", flush=True)
         try:
-            if has_nearby_significant_event(candidate, EXCLUSION_DAYS):
+            if has_nearby_significant_event(candidate, EXCLUSION_DAYS, station):
+                print("pominieto (blisko M>=4.5 w promieniu stacji)")
                 continue
         except Exception as e:
-            print(f"      pominieto sprawdzenie wykluczenia dla {candidate.isoformat()}: {e}")
+            print(f"pominieto sprawdzenie wykluczenia ({type(e).__name__}: {e})")
             continue
         try:
             t, s = fetch_window(client, station, candidate, WINDOW_HOURS, 0.0)
-        except Exception:
+        except Exception as e:
+            print(f"pominieto ({type(e).__name__}: {e})")
             continue
         feat = ringdown_window_feature(t, s, core)
         bg_features.append(feat["frac_oscillatory"])
         bg_meta.append({"station": station["sta"], "time": candidate.isoformat(), **feat})
+        print(f"OK (frac_oscillatory={feat['frac_oscillatory']:.3f}, n_candidates={feat['n_candidates']})")
+
+    time_budget_hit = (time.time() - t_start) >= bg_time_budget_s and len(bg_features) < n_background
+    if time_budget_hit:
+        print(f"      (budzet czasu {bg_time_budget_s:.0f}s wyczerpany - uzyto {len(bg_features)}/{n_background} "
+              f"okien tla zebranych do tego momentu, nie wszystkie {n_background})")
 
     print(f"      -> {len(pre_features)} okien pre-event, {len(bg_features)} okien tla")
     if len(pre_features) < 5 or len(bg_features) < 5:
@@ -455,6 +536,7 @@ def run_real_test(min_magnitude: float, years: int, n_background: int) -> dict:
         "mannwhitney_p_value": float(p_value),
         "significant_at_0_05": bool(p_value < 0.05),
         "pre_event_higher_than_background": bool(np.mean(pre_features) > np.mean(bg_features)),
+        "background_time_budget_hit": bool(time_budget_hit),
         "pre_event_details": pre_meta,
         "background_details": bg_meta,
     }
@@ -467,6 +549,12 @@ def main():
     ap.add_argument("--min-magnitude", type=float, default=MIN_MAGNITUDE_DEFAULT)
     ap.add_argument("--years", type=int, default=5)
     ap.add_argument("--n-background", type=int, default=60)
+    ap.add_argument("--max-pre-events", type=int, default=40,
+                     help="losowa probka (seed=7) z katalogu pre-event, dla przewidywalnego czasu dzialania (0 = bez limitu, wszystkie zdarzenia z katalogu)")
+    ap.add_argument("--waveform-timeout", type=float, default=20.0,
+                     help="timeout (s) na pojedyncze zapytanie o fale sejsmiczne do EarthScope/IRIS")
+    ap.add_argument("--background-time-budget-s", type=float, default=240.0,
+                     help="twardy limit czasu (s) na caly krok liczenia okien tla [3/4] - zatrzymuje sie z tym, co udalo sie zebrac, zamiast dzialac bez przewidywalnej granicy")
     ap.add_argument("--out", default="precursor_ringdown_test_output.json")
     args = ap.parse_args()
 
@@ -495,12 +583,18 @@ def main():
         print("KROK 2: test na REALNYCH danych (USGS + EarthScope/IRIS)")
         print("=" * 70)
         try:
-            real = run_real_test(args.min_magnitude, args.years, args.n_background)
+            real = run_real_test(args.min_magnitude, args.years, args.n_background,
+                                  args.max_pre_events, args.waveform_timeout,
+                                  args.background_time_budget_s)
         except Exception as e:
             print(f"\nBLAD podczas testu na realnych danych: {type(e).__name__}: {e}")
-            print("(Typowa przyczyna w środowisku bez pełnego dostępu do sieci: brak")
-            print(" połączenia z earthquake.usgs.gov / service.earthscope.org.")
-            print(" Uruchom ten skrypt na maszynie z pełnym dostępem do internetu.)")
+            print("(Jesli katalog USGS w kroku [1/4] pobral sie poprawnie, dostep do")
+            print(" sieci DZIALA - blad jest gdzies indziej (patrz komunikat wyzej i")
+            print(" ewentualny traceback ponizej). Jesli nawet krok [1/4] sie nie uda,")
+            print(" typowa przyczyna to brak dostepu do earthquake.usgs.gov z tej")
+            print(" maszyny/sieci.)")
+            import traceback
+            traceback.print_exc()
             with open(args.out, "w") as f:
                 json.dump(result, f, indent=2, default=str)
             sys.exit(2)

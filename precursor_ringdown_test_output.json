@@ -13,5 +13,619 @@
       "mean_frac_oscillatory_with_signal": 0.09620370370370371,
       "mean_frac_oscillatory_background": 0.0
     }
+  },
+  "real_test": {
+    "n_pre_event_windows": 40,
+    "n_background_windows": 60,
+    "mean_frac_oscillatory_pre_event": 0.06829776835536383,
+    "mean_frac_oscillatory_background": 0.06005018867009831,
+    "mannwhitney_p_value": 0.9970551895863518,
+    "significant_at_0_05": false,
+    "pre_event_higher_than_background": true,
+    "background_time_budget_hit": false,
+    "pre_event_details": [
+      {
+        "event_id": "us6000nith",
+        "station": "MAJO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 5
+      },
+      {
+        "event_id": "us6000rfb2",
+        "station": "CTAO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 12
+      },
+      {
+        "event_id": "us7000lgwp",
+        "station": "CTAO",
+        "frac_oscillatory": 0.07142857142857142,
+        "n_candidates": 14
+      },
+      {
+        "event_id": "us7000i8ui",
+        "station": "MAJO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 13
+      },
+      {
+        "event_id": "us7000st95",
+        "station": "CTAO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 19
+      },
+      {
+        "event_id": "us6000sri7",
+        "station": "MAJO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 10
+      },
+      {
+        "event_id": "us6000k1mn",
+        "station": "MAJO",
+        "frac_oscillatory": 0.0625,
+        "n_candidates": 16
+      },
+      {
+        "event_id": "us6000shlp",
+        "station": "CTAO",
+        "frac_oscillatory": 0.17647058823529413,
+        "n_candidates": 17
+      },
+      {
+        "event_id": "us6000mksx",
+        "station": "CTAO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 7
+      },
+      {
+        "event_id": "us7000j5x2",
+        "station": "HRV",
+        "frac_oscillatory": 0.0625,
+        "n_candidates": 16
+      },
+      {
+        "event_id": "us7000srb1",
+        "station": "CTAO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 24
+      },
+      {
+        "event_id": "us6000kdce",
+        "station": "CTAO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 16
+      },
+      {
+        "event_id": "us7000qcik",
+        "station": "CTAO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 18
+      },
+      {
+        "event_id": "us6000t7zc",
+        "station": "HRV",
+        "frac_oscillatory": 0.1,
+        "n_candidates": 20
+      },
+      {
+        "event_id": "us7000s789",
+        "station": "CTAO",
+        "frac_oscillatory": 0.16666666666666666,
+        "n_candidates": 12
+      },
+      {
+        "event_id": "us7000l9h2",
+        "station": "CTAO",
+        "frac_oscillatory": 0.16666666666666666,
+        "n_candidates": 6
+      },
+      {
+        "event_id": "us6000lq00",
+        "station": "CTAO",
+        "frac_oscillatory": 0.20679886685552407,
+        "n_candidates": 353
+      },
+      {
+        "event_id": "us6000sxwq",
+        "station": "MAJO",
+        "frac_oscillatory": 0.1111111111111111,
+        "n_candidates": 18
+      },
+      {
+        "event_id": "us6000q41n",
+        "station": "CTAO",
+        "frac_oscillatory": 0.0625,
+        "n_candidates": 16
+      },
+      {
+        "event_id": "us6000si5l",
+        "station": "HRV",
+        "frac_oscillatory": 0.10256410256410256,
+        "n_candidates": 39
+      },
+      {
+        "event_id": "us7000jkbd",
+        "station": "CTAO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 6
+      },
+      {
+        "event_id": "us6000lp12",
+        "station": "CTAO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 9
+      },
+      {
+        "event_id": "us6000t04s",
+        "station": "HRV",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 7
+      },
+      {
+        "event_id": "us7000jgfd",
+        "station": "CTAO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 6
+      },
+      {
+        "event_id": "us6000rtdt",
+        "station": "MAJO",
+        "frac_oscillatory": 0.2857142857142857,
+        "n_candidates": 14
+      },
+      {
+        "event_id": "us7000pwkn",
+        "station": "ANMO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 15
+      },
+      {
+        "event_id": "us6000iv6c",
+        "station": "ANMO",
+        "frac_oscillatory": 0.05263157894736842,
+        "n_candidates": 19
+      },
+      {
+        "event_id": "us7000ingh",
+        "station": "CTAO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 17
+      },
+      {
+        "event_id": "us7000g7lx",
+        "station": "CTAO",
+        "frac_oscillatory": 0.06666666666666667,
+        "n_candidates": 15
+      },
+      {
+        "event_id": "us6000h6nr",
+        "station": "MAJO",
+        "frac_oscillatory": 0.1111111111111111,
+        "n_candidates": 54
+      },
+      {
+        "event_id": "us6000jlm1",
+        "station": "BFO",
+        "frac_oscillatory": 0.38271604938271603,
+        "n_candidates": 324
+      },
+      {
+        "event_id": "us7000hcmn",
+        "station": "HRV",
+        "frac_oscillatory": 0.15384615384615385,
+        "n_candidates": 13
+      },
+      {
+        "event_id": "us6000fr0b",
+        "station": "CTAO",
+        "frac_oscillatory": 0.075,
+        "n_candidates": 40
+      },
+      {
+        "event_id": "ak021d1u1nos",
+        "station": "COLA",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 4
+      },
+      {
+        "event_id": "us7000q0bm",
+        "station": "CTAO",
+        "frac_oscillatory": 0.07692307692307693,
+        "n_candidates": 13
+      },
+      {
+        "event_id": "us7000stti",
+        "station": "BFO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 12
+      },
+      {
+        "event_id": "us7000jh99",
+        "station": "CTAO",
+        "frac_oscillatory": 0.14285714285714285,
+        "n_candidates": 7
+      },
+      {
+        "event_id": "us6000rjq8",
+        "station": "HRV",
+        "frac_oscillatory": 0.09523809523809523,
+        "n_candidates": 21
+      },
+      {
+        "event_id": "nc75095651",
+        "station": "PFO",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 12
+      },
+      {
+        "event_id": "us7000ghm5",
+        "station": "HRV",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 9
+      }
+    ],
+    "background_details": [
+      {
+        "station": "COLA",
+        "time": "2021-10-09T20:42:45.338105+00:00",
+        "frac_oscillatory": 0.21052631578947367,
+        "n_candidates": 19
+      },
+      {
+        "station": "HRV",
+        "time": "2022-11-15T03:30:16.962327+00:00",
+        "frac_oscillatory": 0.1,
+        "n_candidates": 10
+      },
+      {
+        "station": "KONO",
+        "time": "2025-04-30T06:40:50.503976+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 17
+      },
+      {
+        "station": "COLA",
+        "time": "2024-08-06T20:48:48.817560+00:00",
+        "frac_oscillatory": 0.13333333333333333,
+        "n_candidates": 15
+      },
+      {
+        "station": "ANMO",
+        "time": "2021-10-18T14:21:35.015590+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 13
+      },
+      {
+        "station": "ANMO",
+        "time": "2024-06-14T11:46:30.978755+00:00",
+        "frac_oscillatory": 0.09090909090909091,
+        "n_candidates": 22
+      },
+      {
+        "station": "HRV",
+        "time": "2025-09-10T10:17:43.863555+00:00",
+        "frac_oscillatory": 0.10344827586206896,
+        "n_candidates": 29
+      },
+      {
+        "station": "ANMO",
+        "time": "2025-06-10T01:00:15.103617+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 9
+      },
+      {
+        "station": "KONO",
+        "time": "2025-02-19T07:44:49.256339+00:00",
+        "frac_oscillatory": 0.11538461538461539,
+        "n_candidates": 26
+      },
+      {
+        "station": "CTAO",
+        "time": "2023-01-14T08:00:22.609379+00:00",
+        "frac_oscillatory": 0.12280701754385964,
+        "n_candidates": 57
+      },
+      {
+        "station": "PFO",
+        "time": "2026-06-07T03:10:26.680160+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 12
+      },
+      {
+        "station": "CTAO",
+        "time": "2022-02-27T18:03:05.856245+00:00",
+        "frac_oscillatory": 0.10526315789473684,
+        "n_candidates": 19
+      },
+      {
+        "station": "CTAO",
+        "time": "2024-08-31T00:26:30.080526+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 11
+      },
+      {
+        "station": "ANMO",
+        "time": "2025-04-17T23:29:37.580476+00:00",
+        "frac_oscillatory": 0.058823529411764705,
+        "n_candidates": 17
+      },
+      {
+        "station": "COLA",
+        "time": "2026-07-06T03:42:43.118862+00:00",
+        "frac_oscillatory": 0.058823529411764705,
+        "n_candidates": 17
+      },
+      {
+        "station": "HRV",
+        "time": "2025-10-16T21:09:56.914007+00:00",
+        "frac_oscillatory": 0.1111111111111111,
+        "n_candidates": 18
+      },
+      {
+        "station": "CTAO",
+        "time": "2024-07-13T21:15:55.718681+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 15
+      },
+      {
+        "station": "COLA",
+        "time": "2021-11-16T20:20:58.269420+00:00",
+        "frac_oscillatory": 0.15384615384615385,
+        "n_candidates": 13
+      },
+      {
+        "station": "PFO",
+        "time": "2025-07-06T01:38:05.430156+00:00",
+        "frac_oscillatory": 0.058823529411764705,
+        "n_candidates": 17
+      },
+      {
+        "station": "COLA",
+        "time": "2025-12-03T04:09:27.704263+00:00",
+        "frac_oscillatory": 0.09090909090909091,
+        "n_candidates": 11
+      },
+      {
+        "station": "COLA",
+        "time": "2023-07-19T22:46:12.618771+00:00",
+        "frac_oscillatory": 0.06666666666666667,
+        "n_candidates": 15
+      },
+      {
+        "station": "BFO",
+        "time": "2024-10-28T08:13:12.626206+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 7
+      },
+      {
+        "station": "CTAO",
+        "time": "2022-06-18T01:29:27.494166+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 17
+      },
+      {
+        "station": "CTAO",
+        "time": "2022-09-11T13:38:58.066643+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 32
+      },
+      {
+        "station": "HRV",
+        "time": "2025-02-26T00:58:16.480739+00:00",
+        "frac_oscillatory": 0.14814814814814814,
+        "n_candidates": 27
+      },
+      {
+        "station": "COLA",
+        "time": "2024-09-09T21:10:46.428166+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 10
+      },
+      {
+        "station": "KONO",
+        "time": "2024-04-26T00:34:05.264639+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 13
+      },
+      {
+        "station": "PFO",
+        "time": "2025-01-25T15:20:44.550678+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 15
+      },
+      {
+        "station": "ANMO",
+        "time": "2022-10-17T05:32:49.441895+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 10
+      },
+      {
+        "station": "ANMO",
+        "time": "2025-09-02T10:14:51.320200+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 21
+      },
+      {
+        "station": "PFO",
+        "time": "2026-03-18T16:36:13.516172+00:00",
+        "frac_oscillatory": 0.14285714285714285,
+        "n_candidates": 7
+      },
+      {
+        "station": "CTAO",
+        "time": "2022-09-17T06:17:02.921052+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 10
+      },
+      {
+        "station": "BFO",
+        "time": "2023-08-17T05:55:07.613841+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 11
+      },
+      {
+        "station": "BFO",
+        "time": "2022-05-12T23:01:01.835499+00:00",
+        "frac_oscillatory": 0.1111111111111111,
+        "n_candidates": 18
+      },
+      {
+        "station": "KONO",
+        "time": "2022-11-18T07:31:34.867782+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 5
+      },
+      {
+        "station": "HRV",
+        "time": "2025-05-19T12:26:47.275923+00:00",
+        "frac_oscillatory": 0.1111111111111111,
+        "n_candidates": 27
+      },
+      {
+        "station": "KONO",
+        "time": "2024-03-12T02:29:35.441500+00:00",
+        "frac_oscillatory": 0.06451612903225806,
+        "n_candidates": 31
+      },
+      {
+        "station": "COLA",
+        "time": "2025-06-04T12:30:00.054515+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 15
+      },
+      {
+        "station": "COLA",
+        "time": "2022-05-31T03:41:28.689429+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 11
+      },
+      {
+        "station": "KONO",
+        "time": "2025-08-09T18:19:03.627347+00:00",
+        "frac_oscillatory": 0.047619047619047616,
+        "n_candidates": 21
+      },
+      {
+        "station": "BFO",
+        "time": "2024-04-16T20:26:59.389827+00:00",
+        "frac_oscillatory": 0.06666666666666667,
+        "n_candidates": 15
+      },
+      {
+        "station": "ANMO",
+        "time": "2025-01-17T17:39:17.583843+00:00",
+        "frac_oscillatory": 0.09090909090909091,
+        "n_candidates": 11
+      },
+      {
+        "station": "COLA",
+        "time": "2025-01-20T08:09:20.442705+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 8
+      },
+      {
+        "station": "HRV",
+        "time": "2025-06-27T21:51:57.620021+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 9
+      },
+      {
+        "station": "CTAO",
+        "time": "2022-03-16T19:13:36.187193+00:00",
+        "frac_oscillatory": 0.07894736842105263,
+        "n_candidates": 38
+      },
+      {
+        "station": "ANMO",
+        "time": "2026-05-31T22:22:44.906119+00:00",
+        "frac_oscillatory": 0.05555555555555555,
+        "n_candidates": 18
+      },
+      {
+        "station": "HRV",
+        "time": "2026-07-03T21:56:24.884435+00:00",
+        "frac_oscillatory": 0.07407407407407407,
+        "n_candidates": 27
+      },
+      {
+        "station": "KONO",
+        "time": "2024-03-08T17:41:55.906205+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 9
+      },
+      {
+        "station": "HRV",
+        "time": "2025-11-08T06:21:32.274430+00:00",
+        "frac_oscillatory": 0.06666666666666667,
+        "n_candidates": 15
+      },
+      {
+        "station": "PFO",
+        "time": "2022-05-31T03:36:05.319501+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 4
+      },
+      {
+        "station": "ANMO",
+        "time": "2024-08-22T07:00:51.532284+00:00",
+        "frac_oscillatory": 0.058823529411764705,
+        "n_candidates": 17
+      },
+      {
+        "station": "BFO",
+        "time": "2021-09-29T18:19:22.193993+00:00",
+        "frac_oscillatory": 0.16666666666666666,
+        "n_candidates": 12
+      },
+      {
+        "station": "CTAO",
+        "time": "2026-01-14T21:15:35.149755+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 15
+      },
+      {
+        "station": "HRV",
+        "time": "2022-11-05T05:15:09.748700+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 10
+      },
+      {
+        "station": "PFO",
+        "time": "2026-01-13T14:03:43.057088+00:00",
+        "frac_oscillatory": 0.0,
+        "n_candidates": 13
+      },
+      {
+        "station": "COLA",
+        "time": "2022-01-28T12:51:45.776658+00:00",
+        "frac_oscillatory": 0.12,
+        "n_candidates": 25
+      },
+      {
+        "station": "BFO",
+        "time": "2025-09-22T11:03:36.053875+00:00",
+        "frac_oscillatory": 0.25,
+        "n_candidates": 8
+      },
+      {
+        "station": "KONO",
+        "time": "2022-04-16T12:47:15.576918+00:00",
+        "frac_oscillatory": 0.07142857142857142,
+        "n_candidates": 14
+      },
+      {
+        "station": "BFO",
+        "time": "2026-05-19T05:12:49.270478+00:00",
+        "frac_oscillatory": 0.07142857142857142,
+        "n_candidates": 14
+      },
+      {
+        "station": "KONO",
+        "time": "2022-12-21T22:43:18.705864+00:00",
+        "frac_oscillatory": 0.22580645161290322,
+        "n_candidates": 31
+      }
+    ]
   }
 }

@@ -128,38 +128,49 @@ Manna-Whitneya U, nie tylko porównanie percentyli).
   vs ≈32% gdy sygnał faktycznie jest).
 - `--mode real`: pełny test na realnych danych (katalog USGS + fale
   sejsmiczne EarthScope/IRIS, 8 stacji GSN, wykluczenie okien tła w
-  promieniu dni od jakiegokolwiek M≥4.5). **Nie uruchomiony w
-  sandboxie, w którym to repo powstało** — ten sandbox ma zablokowany
-  dostęp sieciowy do `service.earthscope.org`/`service.ncedc.org` i do
-  `earthquake.usgs.gov` z poziomu skryptu (potwierdzone: `curl` zwraca
-  403 od proxy dla wszystkich trzech; ObsPy `Client('IRIS')` zwraca
-  `FDSNNoServiceException`).
+  promieniu 1000km od stacji od jakiegokolwiek M≥4.5). Sandbox, w którym
+  to repo powstało, ma zablokowany dostęp sieciowy do wymaganych
+  serwerów, więc test na realnych danych uruchomił użytkownik na
+  własnej maszynie (z prawdziwym dostępem do sieci) — po drodze
+  ujawniło to i pozwoliło naprawić trzy realne błędy w skrypcie, żaden
+  z nich nie był blokadą sieci: (1) zapytanie o katalog wykluczający
+  M≥4.5 pobierało cały globalny katalog na raz i przekraczało limit
+  USGS FDSN 20000 wyników/zapytanie (`HTTP 400`) — naprawiono wąskimi,
+  osobnymi zapytaniami per kandydat; (2) wykluczanie okien tła
+  sprawdzało sejsmiczność na CAŁYM globie zamiast w pobliżu konkretnej
+  stacji, więc odrzucało prawie każdego kandydata (M≥4.5 zdarza się
+  gdzieś na świecie kilka razy dziennie) — naprawiono ograniczeniem do
+  promienia 1000km od stacji; (3) krok liczenia okien tła nie miał
+  żadnego limitu czasu, tylko limit liczby prób, więc czas działania był
+  nieprzewidywalny — naprawiono twardym budżetem czasu (domyślnie 240s).
 
-  Uruchomiony przez użytkownika na jego własnej maszynie (z prawdziwym
-  dostępem do sieci) ujawnił i pozwolił naprawić realny błąd, nie
-  związany z blokadą sieci: pierwotna wersja pobierała CAŁY globalny
-  katalog M≥4.5 z całego badanego okresu (5 lat = 38062 zdarzenia) NA
-  RAZ, żeby wykluczać nim okna tła — to POWYŻEJ limitu USGS FDSN (20000
-  wyników/zapytanie), więc serwer zwracał `HTTP 400 Bad Request`.
-  Naprawiono: każdy kandydat na okno tła dostaje teraz własne, wąskie
-  zapytanie do lekkiego endpointu `/count` (tylko ±`EXCLUSION_DAYS` dni
-  wokół niego), więc żadne pojedyncze zapytanie nigdy nie zbliża się do
-  limitu, niezależnie od długości całego testowanego okresu. Dodano też
-  wspólną sesję HTTP z retry/backoff (429/5xx), bo ta zmiana oznacza
-  setki małych zapytań zamiast jednego dużego.
+  **WYNIK (uruchomienie: 40 okien pre-event z realnego katalogu USGS
+  M≥6.5 z ostatnich 5 lat, 60 okien tła, 8 stacji GSN):**
 
-  Gotowe do odpalenia: `pip install obspy requests scipy && python
+  | | średnia `frac_oscillatory` |
+  |---|---|
+  | pre-event (40 okien) | 0.0683 |
+  | tło (60 okien) | 0.0601 |
+
+  Test Manna-Whitneya U: **p = 0.997**. **Brak statystycznie istotnej
+  różnicy — wynik negatywny.** Cecha zbudowana z `ringdown_resonance()`
+  na kandydatach z `fronts()` NIE jest podwyższona w oknach sprzed
+  prawdziwych dużych wstrząsów względem losowego tła. Zgodne z
+  wcześniejszym testem `Topology(t)` w tym samym repo (też negatywny) —
+  dwie zupełnie różne matematyki, ta sama odpowiedź. Pełny wynik z
+  metadanymi każdego okna: `precursor_ringdown_test_output.json`.
+
+  Odpalenie: `pip install obspy requests scipy && python
   precursor_ringdown_test.py --mode real`.
 
-**Uczciwe zastrzeżenie, zanim ktokolwiek to uruchomi**: USGS oficjalnie
-stwierdza, że nikt nigdy nie przewidział trwale i wiarygodnie dużego
-trzęsienia ziemi i nie oczekuje takiej metody w dającej się przewidzieć
-przyszłości. Ten skrypt nie zakłada z góry pozytywnego wyniku — jeśli
-wyjdzie negatywny (brak istotnej różnicy), to jest prawidłowy wynik,
-dokładnie taki jak dla `Topology(t)` wyżej. Jeśli wyjdzie pozornie
-pozytywny na jednym przebiegu, to jest wstępna przesłanka wymagająca
-replikacji na niezależnym zbiorze zdarzeń, nie dowód — dokładnie tak jak
-„trop” z BTC w `deliverable_timdr_finanse` nie przetrwał replikacji na
+**Uczciwe podsumowanie**: USGS oficjalnie stwierdza, że nikt nigdy nie
+przewidział trwale i wiarygodnie dużego trzęsienia ziemi i nie oczekuje
+takiej metody w dającej się przewidzieć przyszłości. Ten wynik (p=0.997,
+negatywny) jest z tym zgodny. Gdyby wyszedł pozornie pozytywny na tym
+jednym przebiegu (40 zdarzeń, 5 lat, 8 stacji), byłaby to wstępna
+przesłanka wymagająca replikacji na niezależnym zbiorze zdarzeń, nie
+dowód — dokładnie tak jak „trop” z BTC w `deliverable_timdr_finanse` nie
+przetrwał replikacji na
 złocie.
 
 ## Przykład użycia
