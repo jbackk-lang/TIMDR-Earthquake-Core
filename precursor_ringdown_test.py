@@ -339,37 +339,65 @@ def fetch_usgs_catalog(min_magnitude: float, start: datetime, end: datetime) -> 
     return events
 
 
-def usgs_event_count(min_magnitude: float, start: datetime, end: datetime) -> int:
+BACKGROUND_EXCLUSION_RADIUS_KM = 1000  # patrz docstring has_nearby_significant_event
+
+
+def usgs_event_count(min_magnitude: float, start: datetime, end: datetime,
+                      lat: float | None = None, lon: float | None = None,
+                      max_radius_km: float | None = None) -> int:
     """Lekki endpoint /count - zwraca sama liczbe zdarzen bez ich tresci.
-    Uzywany do sprawdzania okien tla BEZ pobierania calego katalogu."""
+    Uzywany do sprawdzania okien tla BEZ pobierania calego katalogu.
+    Jesli podano lat/lon/max_radius_km, zapytanie jest ograniczone do
+    kola o tym promieniu (patrz has_nearby_significant_event)."""
     url = (
         "https://earthquake.usgs.gov/fdsnws/event/1/count"
         f"?starttime={start.strftime('%Y-%m-%dT%H:%M:%S')}"
         f"&endtime={end.strftime('%Y-%m-%dT%H:%M:%S')}"
         f"&minmagnitude={min_magnitude}"
     )
+    if lat is not None and lon is not None and max_radius_km is not None:
+        url += f"&latitude={lat}&longitude={lon}&maxradiuskm={max_radius_km}"
     r = _get_usgs_session().get(url, timeout=30)
     r.raise_for_status()
     return int(r.text.strip())
 
 
-def has_nearby_significant_event(candidate: datetime, days: int, min_magnitude: float = 4.5) -> bool:
-    """ZNALEZIONY I NAPRAWIONY BLAD (podczas pierwszego uruchomienia
-    --mode real na prawdziwej sieci): pierwotna wersja pobierala CALY
-    globalny katalog M>=4.5 z calego okresu (np. 5 lat) NA RAZ, zeby
-    pozniej sprawdzac przynaleznosc kazdego kandydata do niego lokalnie.
-    Dla min_magnitude=4.5 x 5 lat to 38062 zdarzenia - POWYZEJ limitu
-    USGS FDSN (20000 wynikow/zapytanie), co dawalo `HTTPError: 400 Bad
-    Request` przy KAZDYM uruchomieniu, niezaleznie od jakosci polaczenia
-    sieciowego (to nie byl blad sieci, tylko zle sformulowane zapytanie).
-    Naprawiono: zamiast jednego ogromnego zapytania, KAZDY kandydat na
-    tlo dostaje wlasne, WASKIE zapytanie (tylko +/- `days` dni wokol
-    niego) - kazde takie zapytanie jest male i nigdy nie zblizy sie do
-    limitu 20000, niezaleznie od tego, jak dlugi jest cala testowany
-    okres."""
+def has_nearby_significant_event(candidate: datetime, days: int, station: dict,
+                                  min_magnitude: float = 4.5,
+                                  radius_km: float = BACKGROUND_EXCLUSION_RADIUS_KM) -> bool:
+    """DWA ZNALEZIONE I NAPRAWIONE BLEDY (oba wykryte dopiero przy
+    uruchomieniu --mode real na prawdziwej sieci - zaden nie ujawnil sie
+    w trybie syntetycznym, bo tam nie ma prawdziwego katalogu USGS):
+
+    1) Pierwotna wersja pobierala CALY globalny katalog M>=4.5 z calego
+       okresu (np. 5 lat) NA RAZ. Dla min_magnitude=4.5 x 5 lat to 38062
+       zdarzenia - POWYZEJ limitu USGS FDSN (20000 wynikow/zapytanie) ->
+       `HTTPError: 400 Bad Request`. Naprawiono (poprzedni commit):
+       kazdy kandydat dostaje wlasne, waskie zapytanie czasowe.
+
+    2) TEN blad (nowszy, wazniejszy fizycznie): to waskie-czasowe
+       zapytanie nadal bylo GLOBALNE geograficznie (bez ograniczenia
+       lat/lon) - sprawdzalo, czy GDZIEKOLWIEK NA ZIEMI byl M>=4.5 w
+       ciagu +/-3 dni od kandydata. Globalnie zdarza sie kilka M>=4.5
+       DZIENNIE (rzad wielkosci: 1500-2000/rok), wiec w oknie 7-dniowym
+       (+/-3 dni) PRAWIE ZAWSZE cos sie gdzies wydarzy - w praktyce
+       kandydat byl odrzucany niemal za kazdym razem (zaobserwowane:
+       35+ z rzedu odrzuconych na pierwszej probie tla). Wymaganie
+       'cisza sejsmiczna na calym globie' jest niewykonalne i tez nie
+       jest tym, co fizycznie ma znaczenie - liczy sie, czy stacja
+       ZAREJESTROWALA COS ISTOTNEGO W POBLIZU, nie czy Ziemia gdziekolwiek
+       byla akurat calkiem cicha.
+       Naprawiono: zapytanie ograniczone geograficznie do kola o
+       promieniu `radius_km` (domyslnie 1000km) WOKOL STACJI, ktora ma
+       nagrac to okno tla - odzwierciedla realne kryterium 'ten
+       konkretny odczyt nie jest zanieczyszczony bliskim, istotnym
+       wstrzasem', zamiast niemozliwego do spelnienia 'nigdzie na Ziemi
+       nic sie nie dzieje'."""
     start = candidate - timedelta(days=days)
     end = candidate + timedelta(days=days)
-    return usgs_event_count(min_magnitude, start, end) > 0
+    return usgs_event_count(min_magnitude, start, end,
+                             lat=station["lat"], lon=station["lon"],
+                             max_radius_km=radius_km) > 0
 
 
 def fetch_window(client, station: dict, center_time, hours_before: float, hours_after: float):
@@ -456,7 +484,7 @@ def run_real_test(min_magnitude: float, years: int, n_background: int, max_pre_e
         elapsed = time.time() - t_start
         print(f"      [{len(bg_features)+1}/{n_background}, proba {attempts}] {candidate.date()} ({station['sta']}) - {elapsed:.0f}s uplynelo...", end=" ", flush=True)
         try:
-            if has_nearby_significant_event(candidate, EXCLUSION_DAYS):
+            if has_nearby_significant_event(candidate, EXCLUSION_DAYS, station):
                 print("pominieto (blisko M>=4.5)")
                 continue
         except Exception as e:
