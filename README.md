@@ -91,6 +91,63 @@ Domyślne zachowanie istniejących metod (`flow`, `twist`, `trm()` bez
 `method=`, `anomalies`, `fronts`, `sta_lta`, `trigger_onset`) się nie
 zmieniło — wszystkie dotychczasowe testy przechodzą bez modyfikacji.
 
+## `ringdown.py` — powrót do równowagi PO zdarzeniu — i test predykcyjności (`precursor_ringdown_test.py`)
+
+Port 1:1 matematyki `ringdown_resonance()` z universal-state-analyzer /
+TIMDR-Grid-Monitor / analizator-gieldowy-v3 / deliverable_timdr_finanse
+(5. port tej samej, zweryfikowanej funkcji). Analizuje, czy powrót
+sygnału do poziomu odniesienia PO indeksie `event_idx` jest oscylacyjny
+(tłumione „dzwonienie”) czy monotoniczny — to jest narzędzie **opisowe
+(post-event)**, nie predykcyjne samo w sobie.
+
+Test na prawdziwym śladzie `obspy_BW_RJOB_example.csv` (autentyczny
+lokalny wstrząs, tutorial ObsPy): dla głównego wstrząsu w tym śladzie
+wynik `is_oscillatory` jest **wrażliwy na próg szumu** — `False` przy
+`noise_floor_factor>=2.0`, `True` (okres ~4-6s) przy poluzowaniu do
+1.0-1.5. Bez niezależnego pomiaru prawdziwej częstotliwości tego
+wstrząsu nie da się stwierdzić, która odpowiedź jest poprawna — to
+udokumentowane ograniczenie metody zero-crossing na realnych,
+wielomodowych sejsmogramach (patrz `test_ringdown.py`).
+
+### Czy to ma jakąkolwiek moc predykcyjną? (`precursor_ringdown_test.py`)
+
+Osobne pytanie od powyższego, tym samym protokołem co `Topology(t)`
+wyżej w tym README (wynik tamtego testu: **negatywny**): czy cecha
+zbudowana z `ringdown_resonance()` na kandydatach z `fronts()`, policzona
+WYŁĄCZNIE z danych sprzed prawdziwego dużego wstrząsu, jest podwyższona
+względem tych samych cech policzonych w losowych oknach tła (test
+Manna-Whitneya U, nie tylko porównanie percentyli).
+
+- `--mode synthetic` (domyślny, bez sieci): sanity-check metodologii na
+  danych syntetycznych — kalibracja klasyfikatora `ringdown_resonance()`
+  bezpośrednio na tle AR(1) (autoskorelowanym, bliższym realnemu tłu
+  sejsmicznemu niż biały szum, na którym `fronts()` prawie nigdy nic nie
+  znajduje). **Wynik: pipeline zweryfikowany** — wstrzyknięty sygnał
+  wykryty (p≈5×10⁻⁷), brak fałszywego alarmu szum-vs-szum (p≈0.55,
+  fałszywy odsetek klasyfikacji „oscylacyjne” na czystym tle ≈9.6%,
+  vs ≈32% gdy sygnał faktycznie jest).
+- `--mode real`: pełny test na realnych danych (katalog USGS + fale
+  sejsmiczne EarthScope/IRIS, 8 stacji GSN, wykluczenie okien tła w
+  promieniu dni od jakiegokolwiek M≥4.5). **Nie uruchomiony w tym
+  środowisku** — sandbox, w którym to repo powstało, ma zablokowany
+  dostęp sieciowy do `service.earthscope.org`/`service.ncedc.org` i do
+  `earthquake.usgs.gov` z poziomu skryptu (potwierdzone: `curl` zwraca
+  403 od proxy dla wszystkich trzech; ObsPy `Client('IRIS')` zwraca
+  `FDSNNoServiceException`). Gotowe do odpalenia gdziekolwiek jest
+  prawdziwy dostęp do sieci: `pip install obspy requests scipy && python
+  precursor_ringdown_test.py --mode real`.
+
+**Uczciwe zastrzeżenie, zanim ktokolwiek to uruchomi**: USGS oficjalnie
+stwierdza, że nikt nigdy nie przewidział trwale i wiarygodnie dużego
+trzęsienia ziemi i nie oczekuje takiej metody w dającej się przewidzieć
+przyszłości. Ten skrypt nie zakłada z góry pozytywnego wyniku — jeśli
+wyjdzie negatywny (brak istotnej różnicy), to jest prawidłowy wynik,
+dokładnie taki jak dla `Topology(t)` wyżej. Jeśli wyjdzie pozornie
+pozytywny na jednym przebiegu, to jest wstępna przesłanka wymagająca
+replikacji na niezależnym zbiorze zdarzeń, nie dowód — dokładnie tak jak
+„trop” z BTC w `deliverable_timdr_finanse` nie przetrwał replikacji na
+złocie.
+
 ## Przykład użycia
 
 ```python
@@ -112,5 +169,8 @@ confirmed, rejected = core.hybrid_trigger(t, s, nsta=50, nlta=500)
 
 ## Testy
 
-`pytest -q` — 35 przechodzi + 1 pomijany bez ObsPy
-(`test_sta_lta_i_trigger_onset_zgodne_z_obspy`).
+`pytest -q` — 63 testy przechodzą (35 istniejące + `test_ringdown.py`,
+w tym test na prawdziwym śladzie `obspy_BW_RJOB_example.csv`; ObsPy jest
+zainstalowane w środowisku, w którym testy były ostatnio uruchamiane, więc
+`test_sta_lta_i_trigger_onset_zgodne_z_obspy` też się wykonuje, nie jest
+pomijany).
