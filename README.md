@@ -128,13 +128,27 @@ Manna-Whitneya U, nie tylko porównanie percentyli).
   vs ≈32% gdy sygnał faktycznie jest).
 - `--mode real`: pełny test na realnych danych (katalog USGS + fale
   sejsmiczne EarthScope/IRIS, 8 stacji GSN, wykluczenie okien tła w
-  promieniu dni od jakiegokolwiek M≥4.5). **Nie uruchomiony w tym
-  środowisku** — sandbox, w którym to repo powstało, ma zablokowany
+  promieniu dni od jakiegokolwiek M≥4.5). **Nie uruchomiony w
+  sandboxie, w którym to repo powstało** — ten sandbox ma zablokowany
   dostęp sieciowy do `service.earthscope.org`/`service.ncedc.org` i do
   `earthquake.usgs.gov` z poziomu skryptu (potwierdzone: `curl` zwraca
   403 od proxy dla wszystkich trzech; ObsPy `Client('IRIS')` zwraca
-  `FDSNNoServiceException`). Gotowe do odpalenia gdziekolwiek jest
-  prawdziwy dostęp do sieci: `pip install obspy requests scipy && python
+  `FDSNNoServiceException`).
+
+  Uruchomiony przez użytkownika na jego własnej maszynie (z prawdziwym
+  dostępem do sieci) ujawnił i pozwolił naprawić realny błąd, nie
+  związany z blokadą sieci: pierwotna wersja pobierała CAŁY globalny
+  katalog M≥4.5 z całego badanego okresu (5 lat = 38062 zdarzenia) NA
+  RAZ, żeby wykluczać nim okna tła — to POWYŻEJ limitu USGS FDSN (20000
+  wyników/zapytanie), więc serwer zwracał `HTTP 400 Bad Request`.
+  Naprawiono: każdy kandydat na okno tła dostaje teraz własne, wąskie
+  zapytanie do lekkiego endpointu `/count` (tylko ±`EXCLUSION_DAYS` dni
+  wokół niego), więc żadne pojedyncze zapytanie nigdy nie zbliża się do
+  limitu, niezależnie od długości całego testowanego okresu. Dodano też
+  wspólną sesję HTTP z retry/backoff (429/5xx), bo ta zmiana oznacza
+  setki małych zapytań zamiast jednego dużego.
+
+  Gotowe do odpalenia: `pip install obspy requests scipy && python
   precursor_ringdown_test.py --mode real`.
 
 **Uczciwe zastrzeżenie, zanim ktokolwiek to uruchomi**: USGS oficjalnie

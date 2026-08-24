@@ -293,14 +293,38 @@ def run_synthetic_selftest(n_windows=30) -> dict:
 # TRYB REALNY - wymaga obspy + requests + polaczenia z siecia
 # ---------------------------------------------------------------------
 
-def fetch_usgs_catalog(min_magnitude: float, start: datetime, end: datetime) -> list[dict]:
+def _usgs_session():
+    """Wspolna sesja + retry z backoff - petla tla wywoluje
+    usgs_event_count() setki razy (do n_background*20 razy), wiec
+    ponowne uzywanie polaczenia i uodpornienie na chwilowe 429/5xx ma
+    realne znaczenie dla czasu dzialania i stabilnosci."""
     import requests
+    from requests.adapters import HTTPAdapter
+    from urllib3.util.retry import Retry
+
+    session = requests.Session()
+    retry = Retry(total=4, backoff_factor=0.5, status_forcelist=[429, 500, 502, 503, 504])
+    session.mount("https://", HTTPAdapter(max_retries=retry))
+    return session
+
+
+_USGS_SESSION = None
+
+
+def _get_usgs_session():
+    global _USGS_SESSION
+    if _USGS_SESSION is None:
+        _USGS_SESSION = _usgs_session()
+    return _USGS_SESSION
+
+
+def fetch_usgs_catalog(min_magnitude: float, start: datetime, end: datetime) -> list[dict]:
     url = (
         "https://earthquake.usgs.gov/fdsnws/event/1/query"
         f"?format=geojson&starttime={start.date()}&endtime={end.date()}"
         f"&minmagnitude={min_magnitude}"
     )
-    r = requests.get(url, timeout=60)
+    r = _get_usgs_session().get(url, timeout=60)
     r.raise_for_status()
     data = r.json()
     events = []
@@ -315,10 +339,37 @@ def fetch_usgs_catalog(min_magnitude: float, start: datetime, end: datetime) -> 
     return events
 
 
-def fetch_background_catalog(start: datetime, end: datetime) -> list[dict]:
-    """M>=4.5 - szerszy katalog do WYKLUCZANIA okien tla (nawet mniejszy
-    wstrzas w poblizu okna tla by je skazil)."""
-    return fetch_usgs_catalog(4.5, start, end)
+def usgs_event_count(min_magnitude: float, start: datetime, end: datetime) -> int:
+    """Lekki endpoint /count - zwraca sama liczbe zdarzen bez ich tresci.
+    Uzywany do sprawdzania okien tla BEZ pobierania calego katalogu."""
+    url = (
+        "https://earthquake.usgs.gov/fdsnws/event/1/count"
+        f"?starttime={start.strftime('%Y-%m-%dT%H:%M:%S')}"
+        f"&endtime={end.strftime('%Y-%m-%dT%H:%M:%S')}"
+        f"&minmagnitude={min_magnitude}"
+    )
+    r = _get_usgs_session().get(url, timeout=30)
+    r.raise_for_status()
+    return int(r.text.strip())
+
+
+def has_nearby_significant_event(candidate: datetime, days: int, min_magnitude: float = 4.5) -> bool:
+    """ZNALEZIONY I NAPRAWIONY BLAD (podczas pierwszego uruchomienia
+    --mode real na prawdziwej sieci): pierwotna wersja pobierala CALY
+    globalny katalog M>=4.5 z calego okresu (np. 5 lat) NA RAZ, zeby
+    pozniej sprawdzac przynaleznosc kazdego kandydata do niego lokalnie.
+    Dla min_magnitude=4.5 x 5 lat to 38062 zdarzenia - POWYZEJ limitu
+    USGS FDSN (20000 wynikow/zapytanie), co dawalo `HTTPError: 400 Bad
+    Request` przy KAZDYM uruchomieniu, niezaleznie od jakosci polaczenia
+    sieciowego (to nie byl blad sieci, tylko zle sformulowane zapytanie).
+    Naprawiono: zamiast jednego ogromnego zapytania, KAZDY kandydat na
+    tlo dostaje wlasne, WASKIE zapytanie (tylko +/- `days` dni wokol
+    niego) - kazde takie zapytanie jest male i nigdy nie zblizy sie do
+    limitu 20000, niezaleznie od tego, jak dlugi jest cala testowany
+    okres."""
+    start = candidate - timedelta(days=days)
+    end = candidate + timedelta(days=days)
+    return usgs_event_count(min_magnitude, start, end) > 0
 
 
 def fetch_window(client, station: dict, center_time, hours_before: float, hours_after: float):
@@ -351,14 +402,10 @@ def run_real_test(min_magnitude: float, years: int, n_background: int) -> dict:
     if not events:
         raise RuntimeError("Katalog USGS pusty dla podanych parametrow - nie ma czego testowac.")
 
-    print("[2/5] Pobieram szerszy katalog M>=4.5 (do wykluczania okien tla)...")
-    exclusion_catalog = fetch_background_catalog(start, end)
-    exclusion_times = sorted(e["time"] for e in exclusion_catalog)
-
     client = Client("EARTHSCOPE")
     core = TIMDR_EarthquakeCore()
 
-    print(f"[3/5] Licze cechy PRE-EVENT dla {len(events)} realnych wstrzasow...")
+    print(f"[2/4] Licze cechy PRE-EVENT dla {len(events)} realnych wstrzasow...")
     pre_features, pre_meta = [], []
     for ev in events:
         station = nearest_station(ev["lat"], ev["lon"])
@@ -372,14 +419,18 @@ def run_real_test(min_magnitude: float, years: int, n_background: int) -> dict:
         pre_features.append(feat["frac_oscillatory"])
         pre_meta.append({"event_id": ev["id"], "station": station["sta"], **feat})
 
-    print(f"[4/5] Licze cechy TLA dla {n_background} losowych okien...")
+    print(f"[3/4] Licze cechy TLA dla {n_background} losowych okien (kazde z wlasnym, waskim zapytaniem wykluczajacym)...")
     rng = random.Random(42)
     bg_features, bg_meta, attempts = [], [], 0
     while len(bg_features) < n_background and attempts < n_background * 20:
         attempts += 1
         station = rng.choice(RELIABLE_STATIONS)
         candidate = start + timedelta(seconds=rng.uniform(0, (end - start).total_seconds()))
-        if any(abs((candidate - t_ex).total_seconds()) < EXCLUSION_DAYS * 86400 for t_ex in exclusion_times):
+        try:
+            if has_nearby_significant_event(candidate, EXCLUSION_DAYS):
+                continue
+        except Exception as e:
+            print(f"      pominieto sprawdzenie wykluczenia dla {candidate.isoformat()}: {e}")
             continue
         try:
             t, s = fetch_window(client, station, candidate, WINDOW_HOURS, 0.0)
@@ -393,7 +444,7 @@ def run_real_test(min_magnitude: float, years: int, n_background: int) -> dict:
     if len(pre_features) < 5 or len(bg_features) < 5:
         raise RuntimeError("Za malo udanych okien do sensownego testu statystycznego (potrzeba >=5 w kazdej grupie).")
 
-    print("[5/5] Test Manna-Whitneya U (pre-event vs tlo)...")
+    print("[4/4] Test Manna-Whitneya U (pre-event vs tlo)...")
     stat, p_value = mannwhitneyu(pre_features, bg_features, alternative="two-sided")
 
     return {
