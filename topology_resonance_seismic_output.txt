@@ -1,0 +1,25 @@
+
+======================================================================
+Earthquake (nagly poczatek, front=start)
+======================================================================
+ -- R(t) (pelny iloczyn) --
+  [Earthquake (nagly poczatek, front=start)] srednia w oknie przed-startem (30 probek) = 0.0000  | tlo (n=5000 losowych okien): srednia=0.0000, std=0.0000 | percentyl okna przed-startem wzgledem tla = 0.0 (OBNIZONE)
+ -- Topology(t) sama --
+  [Earthquake (nagly poczatek, front=start)] srednia w oknie przed-startem (30 probek) = 0.0184  | tlo (n=5000 losowych okien): srednia=0.0923, std=0.1730 | percentyl okna przed-startem wzgledem tla = 41.5 (NIE odstaje istotnie)
+
+======================================================================
+Gradual drift (stopniowy poczatek)
+======================================================================
+ -- R(t) (pelny iloczyn) --
+  [Gradual drift (stopniowy poczatek)] srednia w oknie przed-startem (30 probek) = 0.0000  | tlo (n=5000 losowych okien): srednia=0.0000, std=0.0000 | percentyl okna przed-startem wzgledem tla = 0.0 (OBNIZONE)
+ -- Topology(t) sama --
+  [Gradual drift (stopniowy poczatek)] srednia w oknie przed-startem (30 probek) = 0.0088  | tlo (n=5000 losowych okien): srednia=0.0095, std=0.0049 | percentyl okna przed-startem wzgledem tla = 34.3 (NIE odstaje istotnie)
+
+======================================================================
+Background noise (brak zdarzenia - kontrola)
+======================================================================
+  (brak realnego zdarzenia - test formalny na srodku sygnalu, oczekiwany wynik: brak istotnego podwyzszenia)
+ -- R(t) (pelny iloczyn) --
+  [Background noise (brak zdarzenia - kontrola)] srednia w oknie przed-startem (30 probek) = 0.0000  | tlo (n=5000 losowych okien): srednia=0.0000, std=0.0000 | percentyl okna przed-startem wzgledem tla = 0.0 (OBNIZONE)
+ -- Topology(t) sama --
+  [Background noise (brak zdarzenia - kontrola)] srednia w oknie przed-startem (30 probek) = 0.0195  | tlo (n=5000 losowych okien): srednia=0.0157, std=0.0051 | percentyl okna przed-startem wzgledem tla = 79.7 (NIE odstaje istotnie)

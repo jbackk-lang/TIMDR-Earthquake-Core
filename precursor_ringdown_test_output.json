@@ -1,0 +1,17 @@
+{
+  "synthetic_selftest": {
+    "positive_control_p_value": 5.25765204993327e-07,
+    "positive_control_detected_injected_signal": true,
+    "negative_control_p_value": 0.5501177924916169,
+    "negative_control_no_false_alarm": true,
+    "mean_frac_oscillatory_direct_with_signal": 0.31555555555555564,
+    "mean_frac_oscillatory_direct_background": 0.09555555555555557,
+    "pipeline_verified": true,
+    "end_to_end_fronts_pipeline_diagnostic": {
+      "note": "Diagnostyka pomocnicza (nie bramkuje pipeline_verified): pelny fronts()+ringdown na tym samym tle AR(1). fronts() jest konserwatywny na tym tle (mala liczba niezerowych probek w obu grupach), wiec ten test ma mniejsza moc niz bezposrednia kalibracja klasyfikatora powyzej.",
+      "n_nonzero_samples_of_60": 7,
+      "mean_frac_oscillatory_with_signal": 0.09620370370370371,
+      "mean_frac_oscillatory_background": 0.0
+    }
+  }
+}
