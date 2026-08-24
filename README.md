@@ -194,8 +194,37 @@ confirmed, rejected = core.hybrid_trigger(t, s, nsta=50, nlta=500)
 
 ## Testy
 
-`pytest -q` — 63 testy przechodzą (35 istniejące + `test_ringdown.py`,
-w tym test na prawdziwym śladzie `obspy_BW_RJOB_example.csv`; ObsPy jest
-zainstalowane w środowisku, w którym testy były ostatnio uruchamiane, więc
+`pytest -q` — 65 testów przechodzi (35 istniejące + `test_ringdown.py` +
+`test_selfbaseline_recovery.py` — patrz sekcja "Powrót do normy po
+mikro-wstrząsie" niżej), w tym test na prawdziwym śladzie
+`obspy_BW_RJOB_example.csv`; ObsPy jest zainstalowane w środowisku, w
+którym testy były ostatnio uruchamiane, więc
 `test_sta_lta_i_trigger_onset_zgodne_z_obspy` też się wykonuje, nie jest
 pomijany).
+
+### Powrót do normy po mikro-wstrząsie (`test_selfbaseline_recovery.py`)
+
+Ten sam test co w siostrzanych repo (TIMDR-Crypto-Graph,
+universal-state-analyzer, deliverable_timdr_finanse,
+analizator-gieldowy-v3, TIMDR-Grid-Monitor): czy `anomalies()` fałszywie
+flaguje NOWE, normalne próbki po ustaniu mikro-wstrząsu?
+
+Mechanizm tu jest inny niż wszędzie indziej — `anomalies()` nie jest
+projektowane pod wywołania strumieniowe; TRM (wygładzanie do policzenia
+residuów) patrzy na k=8 najbliższych sąsiadów po czasie **w obie strony**
+w całej przekazanej tablicy — naturalny tryb użycia to analiza już
+zarejestrowanego segmentu za jednym wywołaniem, nie żywy strumień.
+
+Sprawdzone (10 ziaren, mikro-wstrząs: skok +50 do szumu N(0,1) na 20
+próbek, potem powrót do czystego szumu):
+
+- Fałszywe flagi **daleko** po zdarzeniu (≥200 próbek): ~1.0–1.4%,
+  nieodróżnialne od bazowego wskaźnika na całkowicie czystym szumie
+  (~1.2–1.6%). Anomalia nie zostawia trwałego śladu.
+- Jeden, dobrze zrozumiany wyjątek: pierwsza próbka natychmiast po końcu
+  anomalii jest flagowana w każdym z 10 ziaren — bo TRM(k=8) dla niej
+  wciąż obejmuje kilku sąsiadów z ogona anomalii (bilateralne k-NN po
+  czasie), co sztucznie podciąga lokalny baseline. To naturalny artefakt
+  brzegowy ograniczony do pojedynczej próbki (nie "sklejanie się"
+  fałszywych alarmów) — `classify_anomalies()` i tak grupuje go w ten sam
+  blok zdarzenia co samą anomalię.
