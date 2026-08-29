@@ -183,15 +183,34 @@ class TimdrEarthquakeGUI(tk.Tk):
         up outside the visible area. We wrap the content in a
         Canvas + Scrollbar so it's always reachable regardless of window
         height."""
-        canvas = tk.Canvas(container, bg=self.COLORS["bg"], highlightthickness=0,
-                            width=294)
+        # POPRAWKA (panel parametrow chowal sie czesciowo za paskiem
+        # przewijania): canvas i inner-frame mialy NIEZALEZNIE zahardkodowana
+        # szerokosc 294px, dobrana recznie pod zalozenie 96 DPI / brak
+        # skalowania Windows. Przy skalowaniu DPI >100% (bardzo typowe na
+        # laptopach) rzeczywista szerokosc kontenera i paska przewijania w
+        # fizycznych pikselach jest inna niz przyjeta w tej stalej - canvas
+        # bywal SZERSZY niz realnie dostepna przestrzen obok paska, wiec
+        # jego prawa krawedz (a z nia czesc etykiet/pol) renderowala sie
+        # POD paskiem przewijania. Naprawiono podwojnie:
+        #  1. Jawne wlaczenie DPI-awareness dla calego procesu (patrz
+        #     main() nizej) - Tkinter bez tego jest DPI-nieswiadomy na
+        #     Windows i caly interfejs jest wtedy skalowany "na sile" przez
+        #     system operacyjny, co psuje dokladnie tego typu wyliczenia.
+        #  2. Usuniecie zahardkodowanej szerokosci 294 w dwoch miejscach -
+        #     canvas dostaje szerokosc z pack(fill="both", expand=True)
+        #     kontenera (ktory sam ma stala szerokosc, patrz
+        #     left_container w _build_layout), a inner-frame i tak jest
+        #     juz dynamicznie dopasowywany do biezacej szerokosci canvasa
+        #     w _on_canvas_configure ponizej - te dwie stale liczby nigdy
+        #     nie musialy byc zahardkodowane osobno.
+        canvas = tk.Canvas(container, bg=self.COLORS["bg"], highlightthickness=0)
         scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
 
         inner = ttk.Frame(canvas)
-        inner_id = canvas.create_window((0, 0), window=inner, anchor="nw", width=294)
+        inner_id = canvas.create_window((0, 0), window=inner, anchor="nw")
 
         def _on_inner_configure(_event):
             canvas.configure(scrollregion=canvas.bbox("all"))
@@ -601,7 +620,32 @@ class TimdrEarthquakeGUI(tk.Tk):
         self.results_text.configure(state="disabled")
 
 
+def _enable_windows_dpi_awareness():
+    """POPRAWKA: Tkinter na Windows jest domyslnie DPI-nieswiadomy - przy
+    skalowaniu ekranu >100% (bardzo czeste na laptopach, np. 125%/150%)
+    caly interfejs jest wtedy rozciagany "na sile" przez system operacyjny
+    zamiast renderowany natywnie w realnej rozdzielczosci. To byla
+    prawdopodobna przyczyna zgloszonego bledu "panel parametrow chowa sie
+    za paskiem przewijania" - stale liczone w px (patrz
+    _build_scrollable_left) nie odpowiadaly fizycznym pikselom na ekranie.
+    Bezpieczny no-op na innych systemach / starszych Windows (opakowane w
+    try/except, zaden blad nie przerywa startu aplikacji)."""
+    import sys
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
+    except Exception:
+        try:
+            import ctypes
+            ctypes.windll.user32.SetProcessDPIAware()  # starsze Windows (Vista-8)
+        except Exception:
+            pass  # np. brak shcore.dll - nie blokujemy startu aplikacji
+
+
 def main():
+    _enable_windows_dpi_awareness()
     app = TimdrEarthquakeGUI()
     app.mainloop()
 
