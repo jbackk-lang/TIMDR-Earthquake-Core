@@ -232,6 +232,63 @@ Ale kierunek wyniku (degradacja rozdzielczości, nie tylko odsetka
 wykryć) jest spójny między dwiema niezależnymi implementacjami i dwoma
 niezależnymi modelami sygnału.
 
+## To samo zjawisko na REALNYM katalogu Ridgecrest 2019 (`stai_real_ridgecrest_test.py`)
+
+Powyższe zastrzeżenie ("nie na prawdziwym katalogu") zamknięte
+częściowo: zamiast wymyślonej sekwencji Omoriego, czasy i magnitudy
+zdarzeń są w 100% realne — pobrane z katalogu USGS FDSN
+(`earthquake.usgs.gov/fdsnws/event`) dla prawdziwej sekwencji
+Ridgecrest, Kalifornia, lipiec 2019:
+
+- **Gęste okno**: 2019-07-06 03:15-06:15 UTC, pierwsze ~3h po
+  prawdziwym trzęsieniu M7.1 — 283 realne zdarzenia (M≥2,0).
+- **Okno izolowane**: 2019-08-01 (miesiąc później, sekwencja już
+  wygasła) — 7 realnych zdarzeń przy tym samym nominalnym progu M≥2,5
+  (próg podniesiony z M≥2,0 po tym, jak sondowanie pojedynczego
+  zdarzenia pokazało, że poniżej ~M2,5 kontrola pozytywna sama w sobie
+  zawodzi niezależnie od gęstości — patrz kalibracja w docstringu
+  skryptu).
+
+Te realne czasy/magnitudy napędzają syntetyczną falkę (bo prawdziwego
+ciągłego zapisu sejsmometru nie udało się pozyskać w tym środowisku —
+`service.iris.edu` jest wycofane ("NGF: Service Unavailable"),
+`service.earthscope.org` i `raw.githubusercontent.com` nieosiągalne),
+przepuszczoną przez DOKŁADNIE TĘ SAMĄ, niezmienioną implementację
+`TIMDR_EarthquakeCore.sta_lta()`/`trigger_onset()` co powyżej:
+
+| | Recall |
+|---|---|
+| Izolowane realne zdarzenia (kontrola pozytywna) | **100%** (7/7) |
+| Gęste okno po M7.1 (283 realne zdarzenia) | **58,7%** (166/283) |
+
+Ważny szczegół mechanistyczny: recall w gęstym oknie jest PŁASKI w
+całym zakresie M2,5-4,0 (54-57% w każdym przedziale co 0,5), mimo że
+KAŻDA z tych magnitud osobno, w izolacji, przekracza próg detekcji z
+dużym zapasem (M2,5 samo: stosunek STA/LTA 4,13 przy progu 3,5; M3,5
+samo: 9,48). Płaski, nie-zależny-od-SNR spadek recall w zakresie, gdzie
+każde pojedyncze zdarzenie jest łatwo wykrywalne, to sygnatura
+nakładania się kody (STAI), a nie brak czułości detektora.
+
+Niezależne, bezdetektorowe potwierdzenie tego samego zjawiska — sam
+oficjalny katalog USGS: najmniejsza skatalogowana magnituda w gęstym
+oknie to 2,69, a w oknie izolowanym 1,50 — realna niekompletność
+katalogu podczas gęstego okresu, widoczna jeszcze zanim jakikolwiek
+nasz detektor dotknie danych.
+
+Dane źródłowe: `data/ridgecrest_2019/ridgecrest_raw_dense.txt` (283
+zdarzenia) i `ridgecrest_raw_isolated.txt` (46 zdarzeń, filtrowane do
+M≥2,5 w skrypcie). Pełna pre-rejestracja parametrów (kształt falki,
+prawo amplituda-magnituda, progi STA/LTA, reguła dopasowania trigger↔
+zdarzenie) i obie korekty kalibracyjne opisane wprost w docstringu
+`stai_real_ridgecrest_test.py`. Ten sam realny katalog (pierwsze 90s po
+M7.1) jest też teraz dostępny jako piąty scenariusz w GUI (patrz
+`README_gui.md`).
+
+**Co NADAL pozostaje otwarte**: to realne czasy/magnitudy + syntetyczna
+fala, NIE prawdziwy zarejestrowany sejsmogram — walidacja na
+rzeczywistym ciągłym zapisie fal pozostaje zablokowana dostępnością
+danych w tym środowisku, nie metodą.
+
 ## Testy
 
 `pytest -q` — 68 testów przechodzi (35 istniejące + `test_ringdown.py` +

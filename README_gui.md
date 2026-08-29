@@ -16,9 +16,9 @@ podpisy na wykresach) jest teraz w języku angielskim.
 
 - **Load CSV...** — dowolny plik z kolumnami czasu i amplitudy (nazwy
   kolumn konfigurowalne, domyślnie `t`/`s`) przez `SeismicLoader`.
-- **Generate demo** — wybór z rozwijanej listy jednego z czterech
-  syntetycznych scenariuszy (patrz niżej), żeby wypróbować narzędzie
-  bez własnych danych.
+- **Generate demo** — wybór z rozwijanej listy jednego z pięciu
+  scenariuszy (patrz niżej), żeby wypróbować narzędzie bez własnych
+  danych.
 - Checkboxy preprocessingu: detrend / despike / normalizacja amplitudy.
 - Parametry detekcji: `k_neighbors`, próg `twist`, `factor` anomalii,
   oraz **TRM preview** — podgląd wygładzenia metodą `median` /
@@ -39,7 +39,7 @@ podpisy na wykresach) jest teraz w języku angielskim.
   liczbami, w tym rozkładem typów anomalii i (przy hybrydzie) liczbą
   potwierdzeń/odrzuceń.
 
-## Cztery scenariusze demo
+## Pięć scenariuszy demo
 
 - **Earthquake + sensor glitch** — tło + narastająco-opadający wstrząs
   + pojedynczy izolowany glitch czujnika.
@@ -49,6 +49,20 @@ podpisy na wykresach) jest teraz w języku angielskim.
   skokiem) i zostaje na nowym poziomie.
 - **Background noise only (no event)** — czysty szum tła, zero
   zdarzeń — sprawdza, że detektor nie generuje fałszywych alarmów.
+- **Ridgecrest 2019 - real event times/mags (synthetic waveform)** —
+  pierwsze 90s po prawdziwym trzęsieniu M7.1 Ridgecrest (2019-07-06),
+  z trzema kolejnymi realnymi wstrząsami wtórnymi. **Uczciwa
+  proweniencja danych**: czasy i magnitudy zdarzeń są w 100% realne
+  (katalog USGS FDSN, `data/ridgecrest_2019/ridgecrest_raw_dense.txt`,
+  283 realnych zdarzeń łącznie) — ten scenariusz bierze pierwsze 90s z
+  tego pliku. Same PRÓBKI FALI pozostają syntetyczne (stała, z góry
+  ustalona falka umieszczona w każdym realnym czasie zdarzenia,
+  amplituda skalowana do realnej magnitudy) — prawdziwego ciągłego
+  zapisu sejsmometru nie udało się pozyskać w tym środowisku
+  (`service.iris.edu` jest wycofane, inne serwery z falami były
+  nieosiągalne). Pełny opis metody i wyników (recall 58,7% w gęstym
+  oknie vs 100% w izolacji) w `HISTORIA_I_TESTY.md` i
+  `stai_real_ridgecrest_test.py`.
 
 ## Ograniczenie zakresu — to NIE jest predykcja trzęsień
 
@@ -88,6 +102,11 @@ przypadku.
 ## Testowanie
 
 GUI przetestowane automatycznie (Xvfb + zrzuty ekranu) na wszystkich 4
-scenariuszach demo, ze wszystkimi 3 metodami TRM preview i z hybrid
-triggerem włączonym/wyłączonym — bez wyjątków, oraz na 4 różnych
-rozmiarach okna po poprawce resize.
+oryginalnych scenariuszach demo, ze wszystkimi 3 metodami TRM preview i
+z hybrid triggerem włączonym/wyłączonym — bez wyjątków, oraz na 4
+różnych rozmiarach okna po poprawce resize. **Nieuzupełnione**: 5. scenariusz
+("Ridgecrest 2019") dodano później i przetestowano tylko logikę
+generowania danych (`demo_ridgecrest_real()` w izolacji, bez tkinter —
+środowisko developerskie tej sesji nie ma `tkinter`) — sama ścieżka
+GUI (rysowanie, panele wyników) dla tego scenariusza NIE przeszła
+automatycznego testu Xvfb opisanego wyżej.
