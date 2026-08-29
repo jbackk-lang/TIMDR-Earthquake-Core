@@ -159,7 +159,7 @@ class TimdrEarthquakeGUI(tk.Tk):
         body = ttk.Frame(self)
         body.pack(fill="both", expand=True, padx=16, pady=8)
 
-        left_container = ttk.Frame(body, width=310)
+        left_container = ttk.Frame(body, width=345)
         left_container.pack(side="left", fill="y", padx=(0, 12))
         left_container.pack_propagate(False)
 
@@ -183,24 +183,64 @@ class TimdrEarthquakeGUI(tk.Tk):
         up outside the visible area. We wrap the content in a
         Canvas + Scrollbar so it's always reachable regardless of window
         height."""
-        canvas = tk.Canvas(container, bg=self.COLORS["bg"], highlightthickness=0,
-                            width=294)
+        # POPRAWKA (panel parametrow chowal sie czesciowo za paskiem
+        # przewijania): canvas i inner-frame mialy NIEZALEZNIE zahardkodowana
+        # szerokosc 294px, dobrana recznie pod zalozenie 96 DPI / brak
+        # skalowania Windows. Przy skalowaniu DPI >100% (bardzo typowe na
+        # laptopach) rzeczywista szerokosc kontenera i paska przewijania w
+        # fizycznych pikselach jest inna niz przyjeta w tej stalej - canvas
+        # bywal SZERSZY niz realnie dostepna przestrzen obok paska, wiec
+        # jego prawa krawedz (a z nia czesc etykiet/pol) renderowala sie
+        # POD paskiem przewijania. Naprawiono podwojnie:
+        #  1. Jawne wlaczenie DPI-awareness dla calego procesu (patrz
+        #     main() nizej) - Tkinter bez tego jest DPI-nieswiadomy na
+        #     Windows i caly interfejs jest wtedy skalowany "na sile" przez
+        #     system operacyjny, co psuje dokladnie tego typu wyliczenia.
+        #  2. Usuniecie zahardkodowanej szerokosci 294 w dwoch miejscach -
+        #     canvas dostaje szerokosc z pack(fill="both", expand=True)
+        #     kontenera (ktory sam ma stala szerokosc, patrz
+        #     left_container w _build_layout), a inner-frame i tak jest
+        #     juz dynamicznie dopasowywany do biezacej szerokosci canvasa
+        #     w _on_canvas_configure ponizej - te dwie stale liczby nigdy
+        #     nie musialy byc zahardkodowane osobno.
+        # POPRAWKA 2 (te same objawy - urwane pierwsze znaki etykiet -
+        # utrzymywaly sie mimo poprawki #1 powyzej): canvas jest tylko
+        # PIONOWO przewijalny (jeden Scrollbar, orient="vertical"), ale
+        # widget tk.Canvas ma WBUDOWANE domyslne bindingi klawiatury/
+        # gestow (strzalki, Shift+kolko myszy/gest poziomy na trackpadzie),
+        # ktore przewijaja go takze W POZIOMIE (xview) - mimo ze nie ma
+        # widocznego poziomego paska, ktorym dalby sie to cofnac. Jesli
+        # canvas kiedykolwiek dostanie fokus klawiatury (np. Tab) albo
+        # trackpad wysle gest poziomy, xview przesuwa sie o kilka pikseli
+        # w prawo i ZOSTAJE tak juz na stale - obcinajac lewa krawedz
+        # WSZYSTKICH etykiet jednakowo (dokladnie to bylo widac na
+        # zrzucie ekranu). Naprawiono: canvas nie przyjmuje fokusu
+        # klawiatury (takefocus=0) i jego xview jest wymuszane na 0 przy
+        # kazdym przeliczeniu layoutu.
+        canvas = tk.Canvas(container, bg=self.COLORS["bg"], highlightthickness=0, takefocus=0)
         scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=scrollbar.set)
-        canvas.pack(side="left", fill="both", expand=True)
         scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
 
         inner = ttk.Frame(canvas)
-        inner_id = canvas.create_window((0, 0), window=inner, anchor="nw", width=294)
+        inner_id = canvas.create_window((0, 0), window=inner, anchor="nw")
 
         def _on_inner_configure(_event):
             canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.xview_moveto(0)
 
         def _on_canvas_configure(event):
             canvas.itemconfigure(inner_id, width=event.width)
+            canvas.xview_moveto(0)
 
         inner.bind("<Configure>", _on_inner_configure)
         canvas.bind("<Configure>", _on_canvas_configure)
+        # Blokada gestow/klawiszy przewijajacych poziomo ten konkretnie
+        # canvas (celowo tylko pionowy scroll jest tu wspierany).
+        canvas.bind("<Left>", lambda e: "break")
+        canvas.bind("<Right>", lambda e: "break")
+        canvas.bind("<Shift-MouseWheel>", lambda e: "break")
 
         def _on_mousewheel(event):
             delta = -1 * (event.delta // 120) if event.delta else (1 if event.num == 5 else -1)
@@ -273,14 +313,20 @@ class TimdrEarthquakeGUI(tk.Tk):
         self.twist_thr_var = tk.StringVar(value="20")
         self.anomaly_factor_var = tk.StringVar(value="3.0")
 
+        # POPRAWKA (nazwy pol byly wewnetrznym zargonem TIMDR, niezrozumialym
+        # dla sejsmologa bez czytania kodu): "k_neighbors" -> "Smoothing k"
+        # (rozmiar okna mediany uzywanej jako linia bazowa/TRM), "anom.
+        # factor" -> "MAD factor" (to dokladnie mnoznik Median Absolute
+        # Deviation z klasycznej detekcji odstajacych probek - standardowy
+        # termin w QC danych sejsmicznych, patrz kod: threshold = factor*mad).
         self._param_grid(param_frame, [
-            ("k_neighbors:", self.k_var), ("twist thr.:", self.twist_thr_var),
-            ("anom. factor:", self.anomaly_factor_var),
+            ("Smoothing k:", self.k_var), ("Twist thr.:", self.twist_thr_var),
+            ("MAD factor:", self.anomaly_factor_var),
         ])
 
         trm_row = ttk.Frame(param_frame)
         trm_row.pack(fill="x", pady=(4, 0))
-        ttk.Label(trm_row, text="TRM preview:", width=13).pack(side="left")
+        ttk.Label(trm_row, text="Baseline method:", width=15).pack(side="left")
         self.trm_method_var = tk.StringVar(value="median")
         ttk.Combobox(trm_row, textvariable=self.trm_method_var,
                      values=["median", "adaptive", "savgol"], state="readonly",
@@ -304,8 +350,8 @@ class TimdrEarthquakeGUI(tk.Tk):
         self.thr_off_var = tk.StringVar(value="1.0")
 
         self._param_grid(stalta_frame, [
-            ("nsta:", self.nsta_var), ("nlta:", self.nlta_var),
-            ("on thr.:", self.thr_on_var), ("off thr.:", self.thr_off_var),
+            ("STA window:", self.nsta_var), ("LTA window:", self.nlta_var),
+            ("Trigger ON:", self.thr_on_var), ("Trigger OFF:", self.thr_off_var),
         ])
 
         self.hybrid_var = tk.BooleanVar(value=False)
@@ -328,56 +374,119 @@ class TimdrEarthquakeGUI(tk.Tk):
     def _param_grid(self, parent, label_var_pairs, per_row=2):
         """Compact grid of parameter fields, `per_row` per row - replaces
         stacking one field under another, which with more parameters
-        (STA/LTA added 4 more fields) made the left column too tall."""
+        (STA/LTA added 4 more fields) made the left column too tall.
+
+        POPRAWKA 3 (cyfry w polach 2. kolumny chowaly sie POD paskiem
+        przewijania - "twist thr.", "nlta", "off thr." na zrzucie
+        ekranu uzytkownika): etykieta miala ZAHARDKODOWANA stala
+        szerokosc 13 znakow nawet tam, gdzie najdluzsza etykieta w danej
+        grupie byla krotsza (np. "nsta:"/"nlta:"/"off thr.:" w grupie
+        STA/LTA - max 9 znakow, nie 13). Marnowana przestrzen w kolumnie
+        1 wypychala kolumne 2 poza prawa krawedz dostepnej szerokosci
+        panelu (~290-300px), czyli dokladnie pod pasek przewijania.
+        Naprawiono: szerokosc etykiety liczona dynamicznie z najdluzszej
+        etykiety W TEJ KONKRETNEJ grupie, plus lekko zmniejszone pole
+        wpisywania i odstep miedzy kolumnami - razem daje margines,
+        ktory wczesniej byl zerowy albo ujemny.
+        """
         grid = ttk.Frame(parent)
         grid.pack(fill="x")
+        label_w = max(len(label) for label, _ in label_var_pairs)
         for i, (label, var) in enumerate(label_var_pairs):
             r, c = divmod(i, per_row)
             cell = ttk.Frame(grid)
-            cell.grid(row=r, column=c, sticky="w", padx=(0, 10), pady=2)
-            ttk.Label(cell, text=label, width=13).pack(side="left")
-            ttk.Entry(cell, textvariable=var, width=7).pack(side="left")
+            cell.grid(row=r, column=c, sticky="w", padx=(0, 6), pady=2)
+            ttk.Label(cell, text=label, width=label_w).pack(side="left")
+            ttk.Entry(cell, textvariable=var, width=6).pack(side="left")
 
     # ------------------------------------------------------------
     def _build_plot(self, parent):
-        plot_frame = ttk.Frame(parent)
-        plot_frame.pack(fill="both", expand=True)
+        # POPRAWKA (uzytkownik poprosil o wieksze wykresy + pasek przewijania
+        # po prawej): wczesniej figura byla SCISKANA do wysokosci okna (5
+        # wykresow w stosie robilo sie coraz mniejsze na mniejszych
+        # ekranach). Teraz pasek narzedzi (zoom/pan/save) zostaje NA STALE
+        # widoczny u gory, a sama figura ma wiekszy, STALY rozmiar bazowy
+        # (13in wysokosci zamiast 8.5in) i jest opakowana w pionowy
+        # Canvas+Scrollbar (dokladnie ten sam wzorzec co panel parametrow po
+        # lewej) - gdy wykresy sa wyzsze niz okno, przewija sie je zamiast
+        # pomniejszac. Szerokosc nadal sledzi dostepna przestrzen dynamicznie.
+        toolbar_frame = ttk.Frame(parent)
+        toolbar_frame.pack(fill="x", side="top")
 
-        self.fig = Figure(figsize=(7.5, 8.5), dpi=100)
+        scroll_area = ttk.Frame(parent)
+        scroll_area.pack(fill="both", expand=True)
+
+        plot_canvas = tk.Canvas(scroll_area, bg=self.COLORS["bg"], highlightthickness=0, takefocus=0)
+        plot_scrollbar = ttk.Scrollbar(scroll_area, orient="vertical", command=plot_canvas.yview)
+        plot_canvas.configure(yscrollcommand=plot_scrollbar.set)
+        plot_scrollbar.pack(side="right", fill="y")
+        plot_canvas.pack(side="left", fill="both", expand=True)
+
+        plot_inner = ttk.Frame(plot_canvas)
+        plot_inner_id = plot_canvas.create_window((0, 0), window=plot_inner, anchor="nw")
+
+        self.fig = Figure(figsize=(9.0, 13.0), dpi=100)
         self.axes = self.fig.subplots(5, 1, sharex=True)
-        self.fig.subplots_adjust(hspace=0.4, left=0.09, right=0.98, top=0.96, bottom=0.06)
+        self.fig.subplots_adjust(hspace=0.4, left=0.08, right=0.98, top=0.97, bottom=0.045)
         self._draw_placeholder()
 
-        self.canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=plot_inner)
         canvas_widget = self.canvas.get_tk_widget()
-        canvas_widget.pack(fill="both", expand=True)
-        toolbar = NavigationToolbar2Tk(self.canvas, plot_frame)
+        # fill="x" (bez expand/vertical fill) celowo: szerokosc ma sledzic
+        # kontener, wysokosc ma zostac przy swoim naturalnym (duzym) rozmiarze
+        # zamiast byc scisniana do widocznego obszaru.
+        canvas_widget.pack(fill="x")
+        toolbar = NavigationToolbar2Tk(self.canvas, toolbar_frame)
         toolbar.update()
 
-        # Bez tego Figure ma STALY rozmiar w px (figsize*dpi) - Tk canvas
-        # go NIE skaluje przy zmianie rozmiaru okna, tylko PRZYCINA, gdy
-        # dostepna szerokosc/wysokosc jest mniejsza niz domyslne 750x850px
-        # (typowe przy skalowaniu DPI Windows >100% albo mniejszym ekranie
-        # niz zakladane 1220x780 - dokladnie zgloszony problem: "ucina
-        # komorki w tabeli po prawej"). Debounce (after) bo <Configure>
-        # odpala sie wielokrotnie w trakcie przeciagania krawedzi okna.
+        def _on_plot_inner_configure(_event):
+            plot_canvas.configure(scrollregion=plot_canvas.bbox("all"))
+            plot_canvas.xview_moveto(0)
+
+        def _on_plot_canvas_configure(event):
+            plot_canvas.itemconfigure(plot_inner_id, width=event.width)
+
+        plot_inner.bind("<Configure>", _on_plot_inner_configure)
+        plot_canvas.bind("<Configure>", _on_plot_canvas_configure)
+        # Ta sama blokada przypadkowego poziomego przewiniecia co w panelu
+        # po lewej (patrz _build_scrollable_left) - tu tylko pionowo.
+        plot_canvas.bind("<Left>", lambda e: "break")
+        plot_canvas.bind("<Right>", lambda e: "break")
+        plot_canvas.bind("<Shift-MouseWheel>", lambda e: "break")
+
+        def _on_plot_mousewheel(event):
+            delta = -1 * (event.delta // 120) if event.delta else (1 if event.num == 5 else -1)
+            plot_canvas.yview_scroll(int(delta), "units")
+
+        plot_canvas.bind("<Enter>", lambda _e: (plot_canvas.bind_all("<MouseWheel>", _on_plot_mousewheel),
+                                                 plot_canvas.bind_all("<Button-4>", _on_plot_mousewheel),
+                                                 plot_canvas.bind_all("<Button-5>", _on_plot_mousewheel)))
+        plot_canvas.bind("<Leave>", lambda _e: (plot_canvas.unbind_all("<MouseWheel>"),
+                                                 plot_canvas.unbind_all("<Button-4>"),
+                                                 plot_canvas.unbind_all("<Button-5>")))
+
+        # Debounce (after) bo <Configure> odpala sie wielokrotnie w trakcie
+        # przeciagania krawedzi okna.
         self._resize_job = None
         canvas_widget.bind("<Configure>", self._on_plot_resize)
 
     def _on_plot_resize(self, event):
         if self._resize_job is not None:
             self.after_cancel(self._resize_job)
-        self._resize_job = self.after(120, lambda w=event.width, h=event.height: self._apply_plot_resize(w, h))
+        self._resize_job = self.after(120, lambda w=event.width: self._apply_plot_resize(w))
 
-    def _apply_plot_resize(self, width, height):
+    def _apply_plot_resize(self, width):
         self._resize_job = None
-        if width < 100 or height < 100:
+        if width < 100:
             return
         dpi = self.fig.get_dpi()
-        new_w, new_h = width / dpi, height / dpi
-        if abs(new_w - self.fig.get_figwidth()) < 0.05 and abs(new_h - self.fig.get_figheight()) < 0.05:
+        new_w = width / dpi
+        if abs(new_w - self.fig.get_figwidth()) < 0.05:
             return
-        self.fig.set_size_inches(new_w, new_h)
+        # Tylko szerokosc sledzi dostepna przestrzen - wysokosc jest celowo
+        # stala (patrz _build_plot), zeby wykresy nie kurczyly sie na
+        # mniejszych oknach; nadmiar wysokosci jest przewijany.
+        self.fig.set_size_inches(new_w, self.fig.get_figheight())
         self.canvas.draw_idle()
 
     def _draw_placeholder(self):
@@ -601,7 +710,32 @@ class TimdrEarthquakeGUI(tk.Tk):
         self.results_text.configure(state="disabled")
 
 
+def _enable_windows_dpi_awareness():
+    """POPRAWKA: Tkinter na Windows jest domyslnie DPI-nieswiadomy - przy
+    skalowaniu ekranu >100% (bardzo czeste na laptopach, np. 125%/150%)
+    caly interfejs jest wtedy rozciagany "na sile" przez system operacyjny
+    zamiast renderowany natywnie w realnej rozdzielczosci. To byla
+    prawdopodobna przyczyna zgloszonego bledu "panel parametrow chowa sie
+    za paskiem przewijania" - stale liczone w px (patrz
+    _build_scrollable_left) nie odpowiadaly fizycznym pikselom na ekranie.
+    Bezpieczny no-op na innych systemach / starszych Windows (opakowane w
+    try/except, zaden blad nie przerywa startu aplikacji)."""
+    import sys
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)  # PROCESS_SYSTEM_DPI_AWARE
+    except Exception:
+        try:
+            import ctypes
+            ctypes.windll.user32.SetProcessDPIAware()  # starsze Windows (Vista-8)
+        except Exception:
+            pass  # np. brak shcore.dll - nie blokujemy startu aplikacji
+
+
 def main():
+    _enable_windows_dpi_awareness()
     app = TimdrEarthquakeGUI()
     app.mainloop()
 

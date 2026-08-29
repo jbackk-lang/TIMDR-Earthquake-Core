@@ -1,0 +1,19 @@
+# Wymagane (rdzeń biblioteki + CLI)
+numpy>=1.22
+scipy>=1.8
+
+# Wymagane tylko dla gui_app.py (interfejs graficzny)
+matplotlib>=3.5
+
+# Wymagane tylko dla testów
+pytest>=7.0
+
+# Opcjonalne - odblokowują konkretne funkcje, reszta biblioteki działa bez nich:
+# - obspy: weryfikacja sta_lta()/trigger_onset() względem implementacji referencyjnej
+#   (test_sta_lta_i_trigger_onset_zgodne_z_obspy - pomijany automatycznie bez obspy)
+# - requests: precursor_ringdown_test.py --mode real (pobieranie katalogu USGS + fal IRIS)
+# - gudhi: analyze_topology_resonance_seismic.py (analiza topologiczna, wynik już policzony:
+#   negatywny, patrz README - odtworzenie wymaga tej biblioteki)
+# obspy>=1.4
+# requests>=2.28
+# gudhi>=3.8
