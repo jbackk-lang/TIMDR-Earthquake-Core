@@ -192,13 +192,55 @@ events = core.classify_anomalies(t, s)          # [{'start','end','duration','ty
 confirmed, rejected = core.hybrid_trigger(t, s, nsta=50, nlta=500)
 ```
 
+## Rój wstrząsów wtórnych psuje rozdzielczość detekcji (`test_aftershock_swarm_detection.py`)
+
+Pytanie z rozmowy: przy ciągłym monitorowaniu, czy pojedyncze
+trzęsienie jest "rzadkim sygnałem" (łatwym do wykrycia), a rój
+wstrząsów wtórnych psuje to założenie? Wstępny test na prostszym,
+niezależnym syntetycznym sygnale (`TEST-TIMDR/seismology-sta-lta`,
+osobne repo eksperymentalne) pokazał: izolowane trzęsienie 100%
+wykrycia, wczesne wstrząsy wtórne (gęsto skupione tuż po głównym
+wstrząsie) 89-91%, późne (bardziej odosobnione, ale wciąż część roju)
+tylko 37-40%. Ten test sprawdza, czy TO SAMO zjawisko występuje na
+prawdziwej, zweryfikowanej zgodnie z ObsPy implementacji `sta_lta()`/
+`trigger_onset()`/`hybrid_trigger()` w tym repo — **potwierdzone**:
+
+Tło AR(1) + główny wstrząs + sekwencja wstrząsów wtórnych wg prawa
+Omoriego (`nsta=20, nlta=200`, seed=42):
+
+| | Wykrycie |
+|---|---|
+| Izolowany wstrząs (bez roju) | ~100% (10/10 ziaren) |
+| Wczesne wstrząsy wtórne (<200 próbek od głównego) | 91% |
+| Późne wstrząsy wtórne (≥200 próbek) | **40%** |
+
+`hybrid_trigger()` (potwierdzenie twist+anomaly ponad `trigger_onset`)
+daje TEN SAM wynik liczbowy co samo `trigger_onset` — co jest osobną,
+ważną obserwacją: blisko skupione wstrząsy wtórne trafiają w TEN SAM
+przedział `[start,end]` z `trigger_onset` (zlewają się w jeden ciągły
+"blob" zamiast być rozróżnione jako osobne zdarzenia), więc
+`hybrid_trigger` potwierdza/odrzuca całą grupę naraz — to jest
+ograniczenie ROZDZIELCZOŚCI podczas gęstego roju, którego dodanie
+twist/anomaly nie naprawia, bo działa na tym samym pogrupowaniu
+czasowym co bazowy `trigger_onset`.
+
+**Uczciwe zastrzeżenie**: to test na sygnale syntetycznym (AR(1) +
+tłumione oscylacje), nie na prawdziwym katalogu sekwencji wstrząsów
+wtórnych z nakładającymi się falami P/S/kodą wielu zdarzeń jednocześnie
+— realny problem interferencji fal podczas rojów jest bogatszy niż
+tu zamodelowano (patrz ograniczenia w `TEST-TIMDR/seismology-sta-lta/README.md`).
+Ale kierunek wyniku (degradacja rozdzielczości, nie tylko odsetka
+wykryć) jest spójny między dwiema niezależnymi implementacjami i dwoma
+niezależnymi modelami sygnału.
+
 ## Testy
 
-`pytest -q` — 65 testów przechodzi (35 istniejące + `test_ringdown.py` +
+`pytest -q` — 68 testów przechodzi (35 istniejące + `test_ringdown.py` +
 `test_selfbaseline_recovery.py` — patrz sekcja "Powrót do normy po
-mikro-wstrząsie" niżej), w tym test na prawdziwym śladzie
-`obspy_BW_RJOB_example.csv`; ObsPy jest zainstalowane w środowisku, w
-którym testy były ostatnio uruchamiane, więc
+mikro-wstrząsie" niżej + `test_aftershock_swarm_detection.py` — patrz
+sekcja "Rój wstrząsów wtórnych" wyżej), w tym test na prawdziwym
+śladzie `obspy_BW_RJOB_example.csv`; ObsPy jest zainstalowane w
+środowisku, w którym testy były ostatnio uruchamiane, więc
 `test_sta_lta_i_trigger_onset_zgodne_z_obspy` też się wykonuje, nie jest
 pomijany).
 
