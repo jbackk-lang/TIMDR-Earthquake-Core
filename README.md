@@ -104,6 +104,21 @@ dają w tej formie:
 - `anomalies()`/`fronts()` nie są projektowane pod strumień na żywo —
   analizują już zarejestrowany segment za jednym wywołaniem.
 
+  Dodatkowe zastrzeżenia ujawnione w audycie na realnym katalogu Ridgecrest 2019
+EV / jump detection — liczby błędne w pierwszej analizie, kierunek wniosku poprawny.  
+Realne dane M≥2.0 w kroczącym oknie 30 minut dają X_prev=5 (2.80, 2.15, 2.22, 4.97, 4.14) i X_now=125 — pierwsza wersja użyła tylko ostatnich ~5 minut zamiast pełnych 30, oraz tylko 7 zdarzeń po mainshocku zamiast 125. Realny rolling p10/p90 w tym samym oknie to 0 i 118, więc próg 0.3*(118−0)=35.4, nie 0.9.
+EV=TRUE przetrwało nawet poprawiony próg, ale tylko dlatego, że rój jest ekstremalny.
+Uwaga metodologiczna: próg nie może być kalibrowany na oknie, które już zawiera rój — to kołowe. Kalibracja musi być wykonana na spokojnym okresie sprzed sekwencji.
+
+Bias correction — demonstracja arytmetyki, nie test na Ridgecrest.  
+Przykład z §4 skilla używa wymyślonych par (prediction, ground truth) różniących się zawsze o dokładnie 1, co trywialnie daje bias=-1, MAE=1 niezależnie od realności danych.
+To nie jest walidacja jakiegokolwiek modelu predykcyjnego na Ridgecrest, tylko pokaz mechaniki logowania i grupowania po lead time. Materiał źródłowy sam przyznaje: „nie mamy modelu predykcyjnego” — więc wniosek „działa poprawnie, zgodne z protokołem” dotyczy wyłącznie arytmetyki, nie jakości prognoz.
+
+ringdown_resonance() — błąd kategorii: katalog magnitud ≠ sygnał amplitudy.  
+Sekwencja malejących magnitud kolejnych zdarzeń (M7.1 → 4.8 → 4.3 → …) nie jest ringdownem jednej fali, tylko efektem prawa Bátha i rozkładu Gutenberga–Richtera (duże aftershocks przychodzą pierwsze).
+Wniosek „monotonic decay, brak oscylacji” wyciągnięty z listy magnitud nie jest wynikiem ringdown_resonance(), bo funkcja nigdy nie została uruchomiona — wymaga ciągłego przebiegu amplitudy s(t), baseline’u, noise bandu i crossingów, których katalog zdarzeń nie zawiera.
+Realny test ringdown wymaga ciągłego sejsmogramu (np. EarthScope/IRIS), nie katalogu.
+
 ## Pełna historia, metodologia i liczby
 
 Zobacz [`HISTORIA_I_TESTY.md`](HISTORIA_I_TESTY.md) — chronologiczny
