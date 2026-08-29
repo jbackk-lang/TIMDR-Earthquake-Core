@@ -159,7 +159,7 @@ class TimdrEarthquakeGUI(tk.Tk):
         body = ttk.Frame(self)
         body.pack(fill="both", expand=True, padx=16, pady=8)
 
-        left_container = ttk.Frame(body, width=310)
+        left_container = ttk.Frame(body, width=335)
         left_container.pack(side="left", fill="y", padx=(0, 12))
         left_container.pack_propagate(False)
 
@@ -368,15 +368,30 @@ class TimdrEarthquakeGUI(tk.Tk):
     def _param_grid(self, parent, label_var_pairs, per_row=2):
         """Compact grid of parameter fields, `per_row` per row - replaces
         stacking one field under another, which with more parameters
-        (STA/LTA added 4 more fields) made the left column too tall."""
+        (STA/LTA added 4 more fields) made the left column too tall.
+
+        POPRAWKA 3 (cyfry w polach 2. kolumny chowaly sie POD paskiem
+        przewijania - "twist thr.", "nlta", "off thr." na zrzucie
+        ekranu uzytkownika): etykieta miala ZAHARDKODOWANA stala
+        szerokosc 13 znakow nawet tam, gdzie najdluzsza etykieta w danej
+        grupie byla krotsza (np. "nsta:"/"nlta:"/"off thr.:" w grupie
+        STA/LTA - max 9 znakow, nie 13). Marnowana przestrzen w kolumnie
+        1 wypychala kolumne 2 poza prawa krawedz dostepnej szerokosci
+        panelu (~290-300px), czyli dokladnie pod pasek przewijania.
+        Naprawiono: szerokosc etykiety liczona dynamicznie z najdluzszej
+        etykiety W TEJ KONKRETNEJ grupie, plus lekko zmniejszone pole
+        wpisywania i odstep miedzy kolumnami - razem daje margines,
+        ktory wczesniej byl zerowy albo ujemny.
+        """
         grid = ttk.Frame(parent)
         grid.pack(fill="x")
+        label_w = max(len(label) for label, _ in label_var_pairs)
         for i, (label, var) in enumerate(label_var_pairs):
             r, c = divmod(i, per_row)
             cell = ttk.Frame(grid)
-            cell.grid(row=r, column=c, sticky="w", padx=(0, 10), pady=2)
-            ttk.Label(cell, text=label, width=13).pack(side="left")
-            ttk.Entry(cell, textvariable=var, width=7).pack(side="left")
+            cell.grid(row=r, column=c, sticky="w", padx=(0, 6), pady=2)
+            ttk.Label(cell, text=label, width=label_w).pack(side="left")
+            ttk.Entry(cell, textvariable=var, width=6).pack(side="left")
 
     # ------------------------------------------------------------
     def _build_plot(self, parent):
