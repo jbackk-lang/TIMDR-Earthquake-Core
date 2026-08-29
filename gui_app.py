@@ -313,14 +313,20 @@ class TimdrEarthquakeGUI(tk.Tk):
         self.twist_thr_var = tk.StringVar(value="20")
         self.anomaly_factor_var = tk.StringVar(value="3.0")
 
+        # POPRAWKA (nazwy pol byly wewnetrznym zargonem TIMDR, niezrozumialym
+        # dla sejsmologa bez czytania kodu): "k_neighbors" -> "Smoothing k"
+        # (rozmiar okna mediany uzywanej jako linia bazowa/TRM), "anom.
+        # factor" -> "MAD factor" (to dokladnie mnoznik Median Absolute
+        # Deviation z klasycznej detekcji odstajacych probek - standardowy
+        # termin w QC danych sejsmicznych, patrz kod: threshold = factor*mad).
         self._param_grid(param_frame, [
-            ("k_neighbors:", self.k_var), ("twist thr.:", self.twist_thr_var),
-            ("anom. factor:", self.anomaly_factor_var),
+            ("Smoothing k:", self.k_var), ("Twist thr.:", self.twist_thr_var),
+            ("MAD factor:", self.anomaly_factor_var),
         ])
 
         trm_row = ttk.Frame(param_frame)
         trm_row.pack(fill="x", pady=(4, 0))
-        ttk.Label(trm_row, text="TRM preview:", width=13).pack(side="left")
+        ttk.Label(trm_row, text="Baseline method:", width=15).pack(side="left")
         self.trm_method_var = tk.StringVar(value="median")
         ttk.Combobox(trm_row, textvariable=self.trm_method_var,
                      values=["median", "adaptive", "savgol"], state="readonly",
@@ -395,49 +401,92 @@ class TimdrEarthquakeGUI(tk.Tk):
 
     # ------------------------------------------------------------
     def _build_plot(self, parent):
-        plot_frame = ttk.Frame(parent)
-        plot_frame.pack(fill="both", expand=True)
+        # POPRAWKA (uzytkownik poprosil o wieksze wykresy + pasek przewijania
+        # po prawej): wczesniej figura byla SCISKANA do wysokosci okna (5
+        # wykresow w stosie robilo sie coraz mniejsze na mniejszych
+        # ekranach). Teraz pasek narzedzi (zoom/pan/save) zostaje NA STALE
+        # widoczny u gory, a sama figura ma wiekszy, STALY rozmiar bazowy
+        # (13in wysokosci zamiast 8.5in) i jest opakowana w pionowy
+        # Canvas+Scrollbar (dokladnie ten sam wzorzec co panel parametrow po
+        # lewej) - gdy wykresy sa wyzsze niz okno, przewija sie je zamiast
+        # pomniejszac. Szerokosc nadal sledzi dostepna przestrzen dynamicznie.
+        toolbar_frame = ttk.Frame(parent)
+        toolbar_frame.pack(fill="x", side="top")
 
-        self.fig = Figure(figsize=(7.5, 8.5), dpi=100)
+        scroll_area = ttk.Frame(parent)
+        scroll_area.pack(fill="both", expand=True)
+
+        plot_canvas = tk.Canvas(scroll_area, bg=self.COLORS["bg"], highlightthickness=0, takefocus=0)
+        plot_scrollbar = ttk.Scrollbar(scroll_area, orient="vertical", command=plot_canvas.yview)
+        plot_canvas.configure(yscrollcommand=plot_scrollbar.set)
+        plot_scrollbar.pack(side="right", fill="y")
+        plot_canvas.pack(side="left", fill="both", expand=True)
+
+        plot_inner = ttk.Frame(plot_canvas)
+        plot_inner_id = plot_canvas.create_window((0, 0), window=plot_inner, anchor="nw")
+
+        self.fig = Figure(figsize=(9.0, 13.0), dpi=100)
         self.axes = self.fig.subplots(5, 1, sharex=True)
-        # POPRAWKA (podpis "time (s)" pod dolnym wykresem czasem sie
-        # przycinal / zlewal z paskiem narzedzi matplotlib ponizej): margines
-        # "bottom" byl bardzo waski (6% wysokosci figury) - podniesiono do
-        # 9%, co odsuwa caly stos 5 wykresow lekko w gore i zostawia wiecej
-        # miejsca na etykiety osi X + podpis pod ostatnim wykresem.
-        self.fig.subplots_adjust(hspace=0.4, left=0.09, right=0.98, top=0.96, bottom=0.09)
+        self.fig.subplots_adjust(hspace=0.4, left=0.08, right=0.98, top=0.97, bottom=0.045)
         self._draw_placeholder()
 
-        self.canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
+        self.canvas = FigureCanvasTkAgg(self.fig, master=plot_inner)
         canvas_widget = self.canvas.get_tk_widget()
-        canvas_widget.pack(fill="both", expand=True)
-        toolbar = NavigationToolbar2Tk(self.canvas, plot_frame)
+        # fill="x" (bez expand/vertical fill) celowo: szerokosc ma sledzic
+        # kontener, wysokosc ma zostac przy swoim naturalnym (duzym) rozmiarze
+        # zamiast byc scisniana do widocznego obszaru.
+        canvas_widget.pack(fill="x")
+        toolbar = NavigationToolbar2Tk(self.canvas, toolbar_frame)
         toolbar.update()
 
-        # Bez tego Figure ma STALY rozmiar w px (figsize*dpi) - Tk canvas
-        # go NIE skaluje przy zmianie rozmiaru okna, tylko PRZYCINA, gdy
-        # dostepna szerokosc/wysokosc jest mniejsza niz domyslne 750x850px
-        # (typowe przy skalowaniu DPI Windows >100% albo mniejszym ekranie
-        # niz zakladane 1220x780 - dokladnie zgloszony problem: "ucina
-        # komorki w tabeli po prawej"). Debounce (after) bo <Configure>
-        # odpala sie wielokrotnie w trakcie przeciagania krawedzi okna.
+        def _on_plot_inner_configure(_event):
+            plot_canvas.configure(scrollregion=plot_canvas.bbox("all"))
+            plot_canvas.xview_moveto(0)
+
+        def _on_plot_canvas_configure(event):
+            plot_canvas.itemconfigure(plot_inner_id, width=event.width)
+
+        plot_inner.bind("<Configure>", _on_plot_inner_configure)
+        plot_canvas.bind("<Configure>", _on_plot_canvas_configure)
+        # Ta sama blokada przypadkowego poziomego przewiniecia co w panelu
+        # po lewej (patrz _build_scrollable_left) - tu tylko pionowo.
+        plot_canvas.bind("<Left>", lambda e: "break")
+        plot_canvas.bind("<Right>", lambda e: "break")
+        plot_canvas.bind("<Shift-MouseWheel>", lambda e: "break")
+
+        def _on_plot_mousewheel(event):
+            delta = -1 * (event.delta // 120) if event.delta else (1 if event.num == 5 else -1)
+            plot_canvas.yview_scroll(int(delta), "units")
+
+        plot_canvas.bind("<Enter>", lambda _e: (plot_canvas.bind_all("<MouseWheel>", _on_plot_mousewheel),
+                                                 plot_canvas.bind_all("<Button-4>", _on_plot_mousewheel),
+                                                 plot_canvas.bind_all("<Button-5>", _on_plot_mousewheel)))
+        plot_canvas.bind("<Leave>", lambda _e: (plot_canvas.unbind_all("<MouseWheel>"),
+                                                 plot_canvas.unbind_all("<Button-4>"),
+                                                 plot_canvas.unbind_all("<Button-5>")))
+
+        # Debounce (after) bo <Configure> odpala sie wielokrotnie w trakcie
+        # przeciagania krawedzi okna.
         self._resize_job = None
         canvas_widget.bind("<Configure>", self._on_plot_resize)
 
     def _on_plot_resize(self, event):
         if self._resize_job is not None:
             self.after_cancel(self._resize_job)
-        self._resize_job = self.after(120, lambda w=event.width, h=event.height: self._apply_plot_resize(w, h))
+        self._resize_job = self.after(120, lambda w=event.width: self._apply_plot_resize(w))
 
-    def _apply_plot_resize(self, width, height):
+    def _apply_plot_resize(self, width):
         self._resize_job = None
-        if width < 100 or height < 100:
+        if width < 100:
             return
         dpi = self.fig.get_dpi()
-        new_w, new_h = width / dpi, height / dpi
-        if abs(new_w - self.fig.get_figwidth()) < 0.05 and abs(new_h - self.fig.get_figheight()) < 0.05:
+        new_w = width / dpi
+        if abs(new_w - self.fig.get_figwidth()) < 0.05:
             return
-        self.fig.set_size_inches(new_w, new_h)
+        # Tylko szerokosc sledzi dostepna przestrzen - wysokosc jest celowo
+        # stala (patrz _build_plot), zeby wykresy nie kurczyly sie na
+        # mniejszych oknach; nadmiar wysokosci jest przewijany.
+        self.fig.set_size_inches(new_w, self.fig.get_figheight())
         self.canvas.draw_idle()
 
     def _draw_placeholder(self):
