@@ -93,9 +93,12 @@ dają w tej formie:
 - Jeden kanał `s(t)` — brak lokalizacji, magnitud, rozróżnienia P/S.
 - `hybrid_trigger` niezwalidowany względem katalogu z etykietami.
 - Podczas gęstych rojów wstrząsów wtórnych wykrywalność pojedynczych
-  zdarzeń spada (91%→40% w teście na sygnale syntetycznym) — znane w
-  literaturze jako Short-Term Aftershock Incompleteness; to repo tego
-  nie rozwiązuje, tylko to mierzy.
+  zdarzeń spada (91%→40% w teście na sygnale syntetycznym; **potwierdzone
+  też na realnym katalogu USGS sekwencji Ridgecrest 2019** — recall
+  58,7% w gęstym oknie vs 100% kontrola pozytywna na izolowanych
+  zdarzeniach, patrz `HISTORIA_I_TESTY.md`) — znane w literaturze jako
+  Short-Term Aftershock Incompleteness; to repo tego nie rozwiązuje,
+  tylko to mierzy.
 - Dwie testowane hipotezy o przewidywaniu trzęsień dały wynik
   negatywny na realnych danych.
 - `anomalies()`/`fronts()` nie są projektowane pod strumień na żywo —
