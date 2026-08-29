@@ -1,0 +1,28 @@
+REAL-CATALOG completeness check (no synthetic waveform involved,
+pure USGS catalog magnitudes) -- part of the STAI evidence in its
+own right:
+  DENSE window (queried M>=2.0):    n=283  min_mag=2.69  median_mag=3.52
+  ISOLATED window (queried M>=1.5): n=46  min_mag=1.50  median_mag=1.85
+  -> real catalog's own smallest cataloged event is +1.19 magnitude units HIGHER immediately after the M7.1 than a month later, at the same location/network -- i.e. the OFFICIAL catalog itself is already less complete during the dense period (catalog-level STAI,
+independent of anything below).
+  For the sta_lta test below, BOTH windows are filtered to M>=2.5 (dense: 283/283, isolated: 7/46 remain) -- see CALIBRATION NOTE #2 in the docstring for why.
+
+dense: 283 real events loaded, window=10800s (mean inter-event time = 38.16s)
+isolated: 7 real events loaded, window=86400s (mean inter-event time = 12342.86s)
+
+=== DENSE (post-M7.1, real times/mags) ===
+  duration=10800.0s  n_real_events=283  n_trigger_onsets=153  detected=166  recall=0.5866
+=== ISOLATED (2019-08-01, real times/mags) ===
+  duration=86400.0s  n_real_events=7  n_trigger_onsets=7  detected=7  recall=1.0000
+
+=== NEGATIVE CONTROL (pure noise, 5400s) ===
+  n_false_trigger_onsets=0
+
+SUMMARY: recall_dense=0.5866  recall_isolated=1.0000  ratio=0.587
+
+Dense window, recall by magnitude bin (real events, real mags):
+  M[2.5,3.0): n=24 recall=0.542
+  M[3.0,3.5): n=110 recall=0.573
+  M[3.5,4.0): n=102 recall=0.549
+  M[4.0,5.0): n=44 recall=0.705
+  M[5.0,8.0): n=3 recall=1.000
