@@ -203,7 +203,21 @@ class TimdrEarthquakeGUI(tk.Tk):
         #     juz dynamicznie dopasowywany do biezacej szerokosci canvasa
         #     w _on_canvas_configure ponizej - te dwie stale liczby nigdy
         #     nie musialy byc zahardkodowane osobno.
-        canvas = tk.Canvas(container, bg=self.COLORS["bg"], highlightthickness=0)
+        # POPRAWKA 2 (te same objawy - urwane pierwsze znaki etykiet -
+        # utrzymywaly sie mimo poprawki #1 powyzej): canvas jest tylko
+        # PIONOWO przewijalny (jeden Scrollbar, orient="vertical"), ale
+        # widget tk.Canvas ma WBUDOWANE domyslne bindingi klawiatury/
+        # gestow (strzalki, Shift+kolko myszy/gest poziomy na trackpadzie),
+        # ktore przewijaja go takze W POZIOMIE (xview) - mimo ze nie ma
+        # widocznego poziomego paska, ktorym dalby sie to cofnac. Jesli
+        # canvas kiedykolwiek dostanie fokus klawiatury (np. Tab) albo
+        # trackpad wysle gest poziomy, xview przesuwa sie o kilka pikseli
+        # w prawo i ZOSTAJE tak juz na stale - obcinajac lewa krawedz
+        # WSZYSTKICH etykiet jednakowo (dokladnie to bylo widac na
+        # zrzucie ekranu). Naprawiono: canvas nie przyjmuje fokusu
+        # klawiatury (takefocus=0) i jego xview jest wymuszane na 0 przy
+        # kazdym przeliczeniu layoutu.
+        canvas = tk.Canvas(container, bg=self.COLORS["bg"], highlightthickness=0, takefocus=0)
         scrollbar = ttk.Scrollbar(container, orient="vertical", command=canvas.yview)
         canvas.configure(yscrollcommand=scrollbar.set)
         scrollbar.pack(side="right", fill="y")
@@ -214,12 +228,19 @@ class TimdrEarthquakeGUI(tk.Tk):
 
         def _on_inner_configure(_event):
             canvas.configure(scrollregion=canvas.bbox("all"))
+            canvas.xview_moveto(0)
 
         def _on_canvas_configure(event):
             canvas.itemconfigure(inner_id, width=event.width)
+            canvas.xview_moveto(0)
 
         inner.bind("<Configure>", _on_inner_configure)
         canvas.bind("<Configure>", _on_canvas_configure)
+        # Blokada gestow/klawiszy przewijajacych poziomo ten konkretnie
+        # canvas (celowo tylko pionowy scroll jest tu wspierany).
+        canvas.bind("<Left>", lambda e: "break")
+        canvas.bind("<Right>", lambda e: "break")
+        canvas.bind("<Shift-MouseWheel>", lambda e: "break")
 
         def _on_mousewheel(event):
             delta = -1 * (event.delta // 120) if event.delta else (1 if event.num == 5 else -1)
