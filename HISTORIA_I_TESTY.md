@@ -289,6 +289,52 @@ fala, NIE prawdziwy zarejestrowany sejsmogram — walidacja na
 rzeczywistym ciągłym zapisie fal pozostaje zablokowana dostępnością
 danych w tym środowisku, nie metodą.
 
+## Trzy dalsze audyty na realnym katalogu Ridgecrest — jeden poprawny po korekcie, jeden zdemaskowany jako demo, jeden zdemaskowany jako błąd kategorii
+
+Po powyższym teście STAI, trzy kolejne wzorce ze skilla
+`timdr-signal-framework` (EV/jump detection, bias correction,
+`ringdown_resonance()`) zostały "przetestowane" na tym samym katalogu
+Ridgecrest — pierwsze wersje miały poważne błędy, złapane dopiero po
+przeliczeniu realnymi danymi zamiast zaufania szacunkom.
+
+**EV / jump detection — liczby błędne, kierunek wniosku przetrwał.**
+Target: liczba zdarzeń M≥2,0 w kroczącym oknie 30 minut. Pierwsza wersja
+podawała `X_prev=2`, `X_now=7`, próg `0.9`. Po przeliczeniu z pełnego
+pliku katalogu: `X_prev=5` (2,80, 2,15, 2,22, 4,97, 4,14 — pierwsza
+wersja użyła tylko ostatnich ~5 minut zamiast pełnych 30), `X_now=125`
+(nie 7 — to była 18-krotna niedoszacowanie, oparte na garści magnitud
+zapamiętanych z wcześniejszej rozmowy, nie na ponownym sprawdzeniu
+pliku źródłowego). Realny rozkład rollingu 30-minutowego w tym samym
+oknie daje `p10=0, p90=118`, więc próg `0.3*(p90-p10)=35,4`, nie `0,9`.
+EV=TRUE przetrwało nawet ten dużo wyższy próg (`delta=120 > 35,4`), ale
+tylko dlatego, że rój jest aż tak ekstremalny. **Uwaga metodologiczna**:
+kalibrowanie progu na oknie, które już zawiera rój, jest kołowe — próg
+powinien być liczony na spokojnym okresie SPRZED sekwencji.
+
+**Bias correction — to była czysta demonstracja arytmetyki, nie test na
+Ridgecrest.** Przykład użył wymyślonych par (predykcja, ground truth)
+różniących się zawsze o dokładnie 1, co trywialnie daje `bias=-1`,
+`MAE=1` niezależnie od realności danych — to pokazuje tylko, że wzór
+jest poprawny (co nigdy nie było wątpliwe), nie że jakikolwiek model
+prognostyczny działa na Ridgecrest. Materiał źródłowy sam przyznawał
+"nie mamy modelu predykcyjnego", więc wniosek "działa poprawnie,
+zgodne z protokołem" nadinterpretował to, co faktycznie sprawdzono
+(mechanikę logowania/grupowania, nie jakość prognoz).
+
+**`ringdown_resonance()` — ten sam błąd kategorii co przy §11
+(samonaprawie), złapany zanim trafił do skilla.** Sekwencja malejących
+magnitud kolejnych zdarzeń (M7,1 → 4,8 → 4,3 → ...) NIE jest sygnałem
+amplitudy w czasie — to prawo Bátha i rozkład Gutenberga-Richtera
+(duże wstrząsy wtórne przychodzą pierwsze), nie ringdown jednej fali.
+Wniosek "monotonic decay, brak oscylacji" wyciągnięty z samej listy
+magnitud nie jest wynikiem `ringdown_resonance()` — funkcja nigdy nie
+została uruchomiona, bo wymaga ciągłego przebiegu amplitudy, którego z
+katalogu zdarzeń nie da się uzyskać.
+
+Wszystkie trzy korekty wpisane do skilla `timdr-signal-framework` (§3,
+§4, §7) jako case studies/zastrzeżenia — patrz tam po pełny,
+angielski tekst poprawek.
+
 ## Testy
 
 `pytest -q` — 68 testów przechodzi (35 istniejące + `test_ringdown.py` +
