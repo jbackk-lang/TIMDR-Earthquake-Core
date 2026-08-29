@@ -159,7 +159,7 @@ class TimdrEarthquakeGUI(tk.Tk):
         body = ttk.Frame(self)
         body.pack(fill="both", expand=True, padx=16, pady=8)
 
-        left_container = ttk.Frame(body, width=335)
+        left_container = ttk.Frame(body, width=345)
         left_container.pack(side="left", fill="y", padx=(0, 12))
         left_container.pack_propagate(False)
 
@@ -344,8 +344,8 @@ class TimdrEarthquakeGUI(tk.Tk):
         self.thr_off_var = tk.StringVar(value="1.0")
 
         self._param_grid(stalta_frame, [
-            ("nsta:", self.nsta_var), ("nlta:", self.nlta_var),
-            ("on thr.:", self.thr_on_var), ("off thr.:", self.thr_off_var),
+            ("STA window:", self.nsta_var), ("LTA window:", self.nlta_var),
+            ("Trigger ON:", self.thr_on_var), ("Trigger OFF:", self.thr_off_var),
         ])
 
         self.hybrid_var = tk.BooleanVar(value=False)
@@ -400,7 +400,12 @@ class TimdrEarthquakeGUI(tk.Tk):
 
         self.fig = Figure(figsize=(7.5, 8.5), dpi=100)
         self.axes = self.fig.subplots(5, 1, sharex=True)
-        self.fig.subplots_adjust(hspace=0.4, left=0.09, right=0.98, top=0.96, bottom=0.06)
+        # POPRAWKA (podpis "time (s)" pod dolnym wykresem czasem sie
+        # przycinal / zlewal z paskiem narzedzi matplotlib ponizej): margines
+        # "bottom" byl bardzo waski (6% wysokosci figury) - podniesiono do
+        # 9%, co odsuwa caly stos 5 wykresow lekko w gore i zostawia wiecej
+        # miejsca na etykiety osi X + podpis pod ostatnim wykresem.
+        self.fig.subplots_adjust(hspace=0.4, left=0.09, right=0.98, top=0.96, bottom=0.09)
         self._draw_placeholder()
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=plot_frame)
