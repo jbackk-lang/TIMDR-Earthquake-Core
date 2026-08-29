@@ -84,11 +84,65 @@ def demo_noise(n=400, seed=3):
     return t, s
 
 
+def demo_ridgecrest_real(duration_s=90.0, fs=100.0, seed=0):
+    """2019 Ridgecrest sequence, first ~90s after the real M7.1 mainshock.
+
+    HONEST DATA PROVENANCE (see timdr-signal-framework skill SS14 item 10
+    for the full writeup and stai_real_ridgecrest_test.py for the source
+    test this reuses): event ORIGIN TIMES and MAGNITUDES below are REAL,
+    pulled from the USGS FDSN catalog (earthquake.usgs.gov/fdsnws/event) -
+    this is the actual, real onset of the M7.1 Ridgecrest earthquake and
+    the real aftershocks that followed it in the first minute and a half.
+    The WAVEFORM SAMPLES are still synthetic: a fixed physically-motivated
+    wavelet is placed at each real event time, with amplitude scaled to
+    the real magnitude (A = 10**(mag-1.5), calibrated so a single isolated
+    event of the smallest cataloged magnitude here is reliably detectable
+    at the GUI's default STA/LTA settings). This is NOT a recorded
+    seismogram - real continuous waveform data could not be obtained in
+    this environment (service.iris.edu is retired, other waveform hosts
+    were unreachable) - but the event TIMING and RELATIVE MAGNITUDES
+    driving it are the real historical record, not invented.
+    Full catalog: data/ridgecrest_2019/ridgecrest_raw_dense.txt (283 real
+    events, ~77 real minutes) - this demo uses only the first
+    `duration_s` seconds of it so it stays GUI-demo-sized.
+    """
+    import os
+    from datetime import datetime
+
+    path = os.path.join(os.path.dirname(__file__), "data", "ridgecrest_2019",
+                         "ridgecrest_raw_dense.txt")
+    t0 = datetime.fromisoformat("2019-07-06T03:19:53.040000+00:00")  # real M7.1 origin time
+    events = []
+    with open(path) as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            iso, mag = line.split(",")
+            dt = datetime.fromisoformat(iso.replace("Z", "+00:00"))
+            t_sec = (dt - t0).total_seconds()
+            if 0 <= t_sec <= duration_s:
+                events.append((t_sec, float(mag)))
+
+    rng = np.random.default_rng(seed)
+    n = int(round(duration_s * fs)) + 1
+    t = np.arange(n, dtype=float) / fs
+    s = rng.normal(0.0, 1.0, size=n)
+    tau, f0 = 3.0, 5.0
+    for t_ev, mag in events:
+        A = 10 ** (mag - 1.5)
+        rel = t - t_ev
+        mask = (rel >= 0) & (rel < 8 * tau)
+        s[mask] += A * (rel[mask] / tau) * np.exp(-rel[mask] / tau) * np.sin(2 * np.pi * f0 * rel[mask])
+    return t, s
+
+
 DEMO_SCENARIOS = {
     "Earthquake + sensor glitch": demo_earthquake,
     "Stuck sensor (dropout)": demo_dropout,
     "Gradual drift (no sudden onset)": demo_drift,
     "Background noise only (no event)": demo_noise,
+    "Ridgecrest 2019 - real event times/mags (synthetic waveform)": demo_ridgecrest_real,
 }
 
 ANOMALY_TYPE_COLORS = {
