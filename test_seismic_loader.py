@@ -87,6 +87,49 @@ def test_load_csv_poprawne_kolumny(tmp_path):
     assert np.allclose(s, np.arange(10, dtype=float))
 
 
+def test_load_csv_bez_naglowka_fallback(tmp_path):
+    """
+    Regresja na realnym pliku uzytkownika: eksport `tr.times()`/`tr.data`
+    z ObsPy do CSV (np. `numpy.savetxt`) typowo nie ma naglowka - pierwszy
+    wiersz to juz dane, np. "0.0,18754". Bez tego fallbacku DictReader
+    brał ten wiersz za nazwy kolumn (fieldnames=['0.0','18754']), zaden
+    kolejny wiersz nie pasowal do t_col='t'/s_col='s', i CALY plik byl
+    odrzucany z ValueError mimo poprawnych danych - tylko dlatego, ze
+    brakowalo naglowka. Sprawdzone na realnym pliku CI.CLC..HHZ z sekwencji
+    Ridgecrest 2019 (36001 probek, wartosci rzedu 1e4) - tu odtworzone w
+    miniaturze.
+    """
+    path = tmp_path / "no_header.csv"
+    with open(path, "w", newline="") as f:
+        w = csvmod.writer(f)
+        w.writerow([0.0, 18754])
+        w.writerow([0.01, 19925])
+        w.writerow([0.02, 19568])
+
+    loader = SeismicLoader(normalize=False, detrend=False, clip_outliers=False)
+    with pytest.warns(UserWarning, match="nie ma naglowka"):
+        t, s = loader.load_csv(str(path))
+    assert len(t) == 3
+    assert np.allclose(t, [0.0, 0.01, 0.02])
+    assert np.allclose(s, [18754.0, 19925.0, 19568.0])
+
+
+def test_load_csv_prawdziwy_naglowek_tekstowy_nadal_rzuca_blad(tmp_path):
+    """Upewnia sie, ze fallback bez naglowka NIE aktywuje sie, gdy plik ma
+    prawdziwy (tekstowy) naglowek z niewlasciwymi nazwami kolumn - to
+    powinno nadal byc jednoznacznym bledem uzytkownika (zla nazwa kolumny),
+    nie po cichu zgadywanym uklad."""
+    path = tmp_path / "text_header.csv"
+    with open(path, "w", newline="") as f:
+        w = csvmod.writer(f)
+        w.writerow(["time", "amplitude"])
+        w.writerow([0.0, 1.0])
+
+    loader = SeismicLoader()
+    with pytest.raises(ValueError):
+        loader.load_csv(str(path))
+
+
 def test_load_json_api_zly_format_rzuca_blad():
     loader = SeismicLoader()
     bad_json = json.dumps({"data": [{"time": 0, "value": 1}, {"time": 1, "value": 2}]})

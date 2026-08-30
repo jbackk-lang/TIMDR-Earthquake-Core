@@ -45,6 +45,43 @@ class SeismicLoader:
         # domyslnymi t_col="t"/s_col="s" dawal t=[], s=[] bez zadnej
         # informacji, co poszlo nie tak.
         if n_rows_total > 0 and len(t) == 0:
+            # POPRAWKA 2 (znaleziona na realnym pliku uzytkownika, eksport
+            # ObsPy "tr.times()/tr.data" do CSV bez naglowka - pierwszy
+            # wiersz danych to np. "0.0,18754"): DictReader bez naglowka
+            # bierze PIERWSZY WIERSZ DANYCH jako nazwy kolumn (tu:
+            # fieldnames=['0.0','18754']), wiec KAZDY wiersz - wlacznie z
+            # tym pierwszym - nie pasuje do t_col/s_col i caly plik ladowal
+            # sie jako pusty, mimo ze dane sa poprawne, tylko bez naglowka.
+            # Fallback: jesli oba "fieldnames" parsuja sie jako liczby
+            # (czyli to nie sa prawdziwe nazwy kolumn, tylko dane), wczytaj
+            # plik ponownie zakladajac 2 kolumny w kolejnosci (t, s) BEZ
+            # naglowka, z tym pierwszym wierszem wlaczonym z powrotem.
+            if len(fieldnames) == 2:
+                try:
+                    first_t, first_s = float(fieldnames[0]), float(fieldnames[1])
+                    headerless_ok = True
+                except (TypeError, ValueError):
+                    headerless_ok = False
+                if headerless_ok:
+                    t2, s2 = [first_t], [first_s]
+                    with open(path, "r", newline="") as f2:
+                        plain_reader = csv.reader(f2)
+                        next(plain_reader, None)  # ten sam pierwszy wiersz, juz dodany wyzej
+                        for row2 in plain_reader:
+                            if len(row2) < 2:
+                                continue
+                            try:
+                                t2.append(float(row2[0]))
+                                s2.append(float(row2[1]))
+                            except ValueError:
+                                continue
+                    warnings.warn(
+                        f"Plik CSV nie ma naglowka (pierwszy wiersz to dane: "
+                        f"{fieldnames}) - wczytano jako 2 kolumny bez naglowka "
+                        f"w kolejnosci (t, s), zamiast szukac kolumn "
+                        f"t_col='{t_col}'/s_col='{s_col}'."
+                    )
+                    return self._postprocess(np.asarray(t2), np.asarray(s2))
             raise ValueError(
                 f"Nie udalo sie odczytac zadnego wiersza z kolumn "
                 f"t_col='{t_col}', s_col='{s_col}'. Kolumny w pliku: "
