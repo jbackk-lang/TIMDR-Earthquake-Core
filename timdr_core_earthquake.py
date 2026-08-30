@@ -9,7 +9,12 @@ Wejście: t (znaczniki czasu, sekundy, ściśle rosnące), s (amplituda).
 """
 
 import numpy as np
-from scipy.signal import savgol_filter
+# NAPRAWIONE: `from scipy.signal import savgol_filter` na poziomie modulu
+# wywalalo caly import tego pliku (a wiec i cale GUI) na maszynach, gdzie
+# Device Guard/WDAC blokuje DLL-e scipy - nawet jesli uzytkownik wcale
+# nie wybral metody "savgol" (domyslna w GUI to "median", ktora scipy w
+# ogole nie potrzebuje). Import przeniesiony do wnetrza `_trm_savgol()`,
+# ladowany tylko wtedy, gdy metoda "savgol" jest faktycznie uzyta.
 
 
 class TIMDR_EarthquakeCore:
@@ -218,6 +223,15 @@ class TIMDR_EarthquakeCore:
         return smooth
 
     def _trm_savgol(self, s, window_length, polyorder):
+        try:
+            from scipy.signal import savgol_filter
+        except ImportError as e:
+            raise ImportError(
+                "Metoda 'savgol' wymaga scipy, ktore nie zaladowalo sie "
+                f"w tym srodowisku ({e}). Uzyj metody 'median' lub "
+                "'adaptive' (nie wymagaja scipy), albo napraw instalacje/"
+                "polityke bezpieczenstwa blokujaca scipy."
+            ) from e
         n = len(s)
         if window_length is None:
             window_length = min(n if n % 2 == 1 else n - 1, max(polyorder + 2, 11))

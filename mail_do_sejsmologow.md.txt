@@ -1,0 +1,33 @@
+Temat: TIMDR-Earthquake-Core — audytowalne narzędzie do analizy jednokanałowego sygnału sejsmicznego (prośba o opinię)
+
+Szanowni Państwo,
+
+piszę w sprawie narzędzia, które rozwijam pod nazwą TIMDR-Earthquake-Core — lekkiego, w pełni audytowalnego zestawu funkcji Python do analizy pojedynczego kanału sejsmicznego s(t): detekcji zdarzeń (STA/LTA), opisowej klasyfikacji kształtu anomalii i heurystyki redukcji fałszywych alarmów. Poniżej przedstawiam, czym to jest na tle istniejących rozwiązań, i chciałbym zapytać o Państwa opinię lub ewentualne zainteresowanie testem na realnych danych.
+
+Czym to NIE jest:
+- Nie jest zamiennikiem SeisComP/Earthworm — brak infrastruktury sieciowej, brak lokalizacji hipocentrum z wielu stacji.
+- Nie jest zamiennikiem PhaseNet/EQTransformer — to nie model głębokiego uczenia; na gęstych sekwencjach (rój wstrząsów wtórnych) te narzędzia mierzalnie wygrywają.
+- Nie liczy magnitud, nie rozróżnia fal P/S, nie lokalizuje źródła.
+
+Co realnie daje inaczej niż wymienione narzędzia:
+1. Cały kod zweryfikowany co do bitu względem ObsPy (sta_lta/trigger_onset) — jeden czytelny plik .py, nie duża baza C++/Fortran; dobre do audytu przed użyciem gdzie indziej albo do nauki, jak STA/LTA faktycznie działa.
+2. Opisowa klasyfikacja KSZTAŁTU anomalii (impuls / spike / step / drift / dropout) bez danych treningowych i bez sieci neuronowej — odróżnia np. realny, trwały skok poziomu od utkniętego czujnika.
+3. hybrid_trigger — potwierdzenie zdarzenia STA/LTA dwoma dodatkowymi, niezależnymi sygnałami z TEGO SAMEGO kanału; próba redukcji liczby fałszywych alarmów tam, gdzie nie ma budżetu na drugą stację. Niezwalidowane względem katalogu z etykietami — traktuję to jako filtr przesiewający, nie certyfikowany detektor.
+4. Publikowane wyniki negatywne z pełną metodologią i danymi: dwie niezależnie testowane hipotezy o przewidywaniu trzęsień (analiza topologiczna, ringdown rezonansowy) dały wynik negatywny na realnych danych USGS/IRIS.
+
+Zmierzone ograniczenie, zgłaszam je otwarcie: podczas gęstych rojów wstrząsów wtórnych wykrywalność pojedynczych zdarzeń przez STA/LTA spada z ok. 91% (izolowany wstrząs) do ok. 40% (późna faza roju) — test na sygnale syntetycznym zgodnym z prawem Omoriego. Odpowiada to znanemu w literaturze zjawisku Short-Term Aftershock Incompleteness (STAI). Narzędzie tego nie rozwiązuje — tylko to mierzy i zgłasza wprost.
+
+Kierunki zastosowania, które widzę:
+- Szybki triage na pojedynczym czujniku (ograniczony budżet, jedna stacja testowa, monitoring niesejsmiczny o podobnym charakterze sygnału).
+- Diagnostyka jakości danych/czujnika (dropout/step/drift) — działa na dowolnym sygnale czasowym o podobnym charakterze, nie tylko sejsmicznym.
+- Materiał referencyjny/edukacyjny — zweryfikowana implementacja STA/LTA jako baza porównawcza przy budowie własnego detektora.
+- Prototypowanie pomysłu przed inwestycją w pełną sieć (SeisComP/Earthworm).
+- Kontrolowane środowisko do testowania nowych hipotez detekcyjnych — kultura pre-rejestracji i kontroli negatywnej wbudowana od początku.
+
+Narzędzie instaluje się jako pakiet Python (`pip install -e .`), ma CLI do analizy pliku CSV bez pisania kodu oraz prosty GUI. Chętnie prześlę kod i pełną dokumentację metodologii/testów, jeśli byliby Państwo zainteresowani spojrzeniem lub testem na realnych danych z Państwa sieci.
+
+https://github.com/jbackk-lang/TIMDR-Earthquake-Core
+
+Z poważaniem,
+Jacek Kielich
+jbackk@gmail.com
