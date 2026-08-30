@@ -404,6 +404,39 @@ Pliki: `real_waveform_test.py` (skrypt testu),
 Pełny angielski zapis tych wyników jest teraz też w skillu
 `timdr-signal-framework` (§7 i §22/§14 punkt 10).
 
+## Import scipy na poziomie modułu wywalał całe GUI, nawet dla metod, które scipy nie używają
+
+`timdr_core_earthquake.py` miał `from scipy.signal import savgol_filter`
+na poziomie modułu — jedyne miejsce w repo, gdzie scipy jest w ogóle
+potrzebne, i to tylko dla JEDNEJ z trzech metod wygładzania w `trm()`
+(`method="savgol"`, opcja alternatywna do domyślnej `"median"`). Na
+komputerze z Windows Device Guard/WDAC blokującym DLL-e scipy
+(`ImportError: DLL load failed while importing _traversal: ...
+zablokowała tę aplikację za pomocą funkcji Device Guard`) całe GUI
+crashowało na starcie — nawet gdy użytkownik nigdy nie zamierzał użyć
+"savgol", bo domyślna metoda w GUI to "median", która scipy w ogóle nie
+dotyka.
+
+**Naprawione**: import przeniesiony do wnętrza `_trm_savgol()`, ładowany
+leniwie tylko gdy ta konkretna metoda jest faktycznie wywołana, z
+czytelnym `ImportError` zamiast crashu całej aplikacji, jeśli scipy
+niedostępne. Zweryfikowane bezpośrednią symulacją zablokowanego importu
+scipy (podmiana `builtins.__import__`): moduł importuje się poprawnie,
+`trm(method="median")` działa normalnie, `trm(method="savgol")` rzuca
+kontrolowany, czytelny błąd zamiast nieobsłużonego wyjątku. 70/70
+testów przechodzi bez zmian.
+
+Ta sama klasa problemu (jeden zaimportowany na sztywno scipy blokuje
+całe repo, mimo że reszta go nie potrzebuje) znaleziona i naprawiona tego
+samego dnia w `TIMDR-Industrial-Predict` i `TIMDR-EV-Predict` — tam
+jedyne użycie (`norm.cdf()`) dało się w ogóle usunąć, zastępując dokładnym
+odpowiednikiem `math.erfc()` ze standardowej biblioteki; tu `savgol_filter`
+nie ma równie prostego zamiennika (Savitzky-Golay to nietrywialny filtr),
+więc zamiast przepisywać go w czystym numpy, zastosowano leniwy import —
+mniej inwazyjne, zero ryzyka subtelnej rozbieżności numerycznej względem
+scipy, kosztem tego że metoda "savgol" nadal wymaga scipy, jeśli ktoś
+świadomie ją wybierze.
+
 ## Testy
 
 `pytest -q` — 68 testów przechodzi (35 istniejące + `test_ringdown.py` +
