@@ -110,3 +110,19 @@ generowania danych (`demo_ridgecrest_real()` w izolacji, bez tkinter —
 środowisko developerskie tej sesji nie ma `tkinter`) — sama ścieżka
 GUI (rysowanie, panele wyników) dla tego scenariusza NIE przeszła
 automatycznego testu Xvfb opisanego wyżej.
+
+**Dodatkowo (na prawdziwym pliku CSV od użytkownika, nie na demo)**:
+`tkinter` nadal nie jest dostępny w tym środowisku, więc rzeczywisty
+render GUI (Xvfb) na prawdziwych danych CI.CLC/CI.RIO nie został
+wykonany — ale dokładna sekwencja wywołań `on_load_csv()` →
+`on_analyze()` (te same funkcje/argumenty, z domyślnymi wartościami
+wszystkich widgetów) została odtworzona bezpośrednio w Pythonie na
+prawdziwym pliku `CLC_HHZ.csv` (36001 próbek, surowe zliczenia rzędu
+1e7). Wynik: przy tym najpierw ujawnił się i został naprawiony realny
+bug (`SeismicLoader.load_csv()` odrzucał ten plik z powodu braku
+nagłówka — patrz `HISTORIA_I_TESTY.md`), a po naprawie cała ścieżka z
+domyślnymi progami (`twist_thr=20`, `MAD factor=3.0`, STA/LTA 25/100,
+thr_on/off=3.0/1.0) poprawnie złapała prawdziwy mainshock na pierwszym
+wyzwoleniu STA/LTA (t=61.1s wobec realnego t≈60.0s), choć detektory
+twist/anomalia zostają, jak już zaznaczono wyżej, przeczulone na
+realnej skali danych (patrz `HISTORIA_I_TESTY.md` po pełne liczby).

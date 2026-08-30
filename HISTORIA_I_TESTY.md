@@ -335,6 +335,75 @@ Wszystkie trzy korekty wpisane do skilla `timdr-signal-framework` (§3,
 §4, §7) jako case studies/zastrzeżenia — patrz tam po pełny,
 angielski tekst poprawek.
 
+## Pierwszy test na PRAWDZIWYM, ciągłym sejsmogramie (nie katalogu, nie syntetyku)
+
+Użytkownik samodzielnie pobrał przez ObsPy na własnym komputerze (ten
+sandbox blokuje IRIS/EarthScope) prawdziwe nagranie stacji CI.CLC i
+CI.RIO, kanał HHZ, 2019-07-06T03:18:52.998Z–03:24:52.998Z (6 minut,
+100Hz, 36001 próbek, surowe zliczenia cyfrowego przetwornika), obejmujące
+prawdziwy mainshock M7,1 Ridgecrest — i przekazał pliki (`.mseed` + `.csv`)
+bezpośrednio do tej sesji.
+
+**`ringdown_resonance()` — potwierdza w pełni znane, udokumentowane
+ograniczenie modułu.** Test pre-zarejestrowany (sweep `noise_floor_factor`
+∈{1,1.5,2,3}, `pre_event_window=500`, `event_idx` z prawdziwego czasu
+mainshocku, uruchomienie jednorazowe). Bez ograniczenia zasięgu: 1885-2006
+"przejść" na obu stacjach przy każdej wartości progu — zdegenerowane
+(cała reszta 6-minutowego zapisu po mainshocku to kod/koda i wstrząsy
+wtórne, nie czysty jednomodowy ringdown). Ograniczone do 30s: CLC nadal
+245-252 przejść (okres≈0,11s, częstotliwość≈9Hz — wyraźnie nie jest to
+prawdziwy mod sejsmiczny, tylko szum progu). RIO pokazało wprost znaną
+czułość progową: `is_oscillatory` zmieniło się z True na False między
+progiem 1,5 a 2,0. Wniosek: na prawdziwych danych funkcja potrzebuje
+znacznie węższego, fizycznie dobranego okna analizy (np. izolującego
+jedną konkretną falę powierzchniową), nie ogólnego zasięgu post-event.
+
+**`sta_lta()`/`trigger_onset()` (niezmienione, nsta=100/1s, nlta=1000/10s,
+thr_on=3,5, thr_off=1,0) — dobrze generalizuje na prawdziwe dane.**
+Poprawnie wykrył mainshock na obu stacjach, z opóźnieniem onsetu RIO
+względem CLC zgodnym z rzeczywistą fizyką czasu przejścia fali (RIO jest
+dalej od epicentrum) — nie błędem, plus kilka prawdziwych wstrząsów
+wtórnych. Czysty podział wyniku: detektor STA/LTA generalizuje na
+rzeczywiste sejsmogramy, analiza ringdown — jak udokumentowano — nie, bez
+znacznie węższego okna.
+
+**Sprawdzenie ścieżki GUI (`on_load_csv()` → `on_analyze()`) na tym samym
+pliku, z domyślnymi ustawieniami GUI bez żadnej ręcznej zmiany**
+(`k=8`, próg twist=20, MAD factor=3,0, STA/LTA 25/100 próbek,
+thr_on/off=3,0/1,0, wszystkie trzy checkboxy preprocessing=True):
+`trigger_onset()` znalazł 17 onsetów w 6-minutowym zapisie, pierwszy przy
+t=61,1s wobec prawdziwego mainshocku przy t≈60,0s — poprawnie złapany, na
+pierwszym wyzwoleniu, z ustawieniami domyślnymi. Detektory twist/anomalia
+są nadal przeczulone na realnych danych (odpowiednio 19,9%/14,6% wszystkich
+próbek oflagowanych), ale flagi NIE są rozrzucone jako jednolity szum tła:
+53% wszystkich flag twist przypada na pierwsze 60s po mainshocku, malejąc
+płynnie później, i zero flag twist w obu 30-sekundowych binach PRZED
+mainshockiem — czyli przeczulenie koncentruje się na prawdziwej energii
+sejsmicznej (koda mainshocku, trwająca aktywność wstrząsów wtórnych), a
+nie strzela losowo w cichym tle, mimo że bezwzględny poziom flagowania
+jest wciąż za wysoki, by liczby z tych dwóch detektorów traktować jako
+liczbę zdarzeń na realnych danych bez retuningu (zgodnie z ostrzeżeniem
+`README_gui.md` o `twist_thr`).
+
+**Przy okazji znaleziony i naprawiony prawdziwy błąd** w
+`SeismicLoader.load_csv()`: plik CSV bez nagłówka (typowy eksport
+`tr.times()`/`tr.data` z ObsPy, pierwszy wiersz to już dane, np.
+`0.0,18754`) był całkowicie odrzucany — `csv.DictReader` brał ten
+pierwszy wiersz za nazwy kolumn, więc żaden wiersz (włącznie z nim) nie
+pasował do `t_col='t'`/`s_col='s'` i cały plik ładował się jako pusty,
+mimo poprawnych danych. Naprawiono fallbackiem: gdy oba "nazwy kolumn"
+parsują się jako liczby, plik jest wczytywany ponownie jako 2 kolumny (t,
+s) bez nagłówka, z ostrzeżeniem `UserWarning`. Zweryfikowano na
+prawdziwym pliku (36001 wierszy poprawnie wczytanych) i dodano 2 nowe
+testy regresyjne (`test_load_csv_bez_naglowka_fallback`,
+`test_load_csv_prawdziwy_naglowek_tekstowy_nadal_rzuca_blad`) — pełny
+`pytest -q` nadal przechodzi.
+
+Pliki: `real_waveform_test.py` (skrypt testu),
+`data/ridgecrest_2019/real_waveform_CLC_RIO/` (dane + `results.txt`).
+Pełny angielski zapis tych wyników jest teraz też w skillu
+`timdr-signal-framework` (§7 i §22/§14 punkt 10).
+
 ## Testy
 
 `pytest -q` — 68 testów przechodzi (35 istniejące + `test_ringdown.py` +

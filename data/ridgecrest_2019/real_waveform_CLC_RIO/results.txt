@@ -1,0 +1,38 @@
+=========== STACJA CLC (CI.CLC..HHZ) ===========
+n=36001 fs=100.0Hz start=2019-07-06T03:18:52.998300Z event_idx=6004 (t_event=60.04s)
+
+-- ringdown_resonance() --
+  noise_floor_factor=1.0: is_oscillatory=True n_crossings=2006 n_peaks=2008 period_s=0.058285952199184976 freq_hz=17.156792713664945 damping_ratio=0.001065972543384162
+  noise_floor_factor=1.5: is_oscillatory=True n_crossings=1982 n_peaks=1984 period_s=0.05957222610931012 freq_hz=16.786346009045936 damping_ratio=0.0011753800953554253
+  noise_floor_factor=2.0: is_oscillatory=True n_crossings=1957 n_peaks=1959 period_s=0.06075669530871153 freq_hz=16.45909137945849 damping_ratio=0.0006164752010449107
+  noise_floor_factor=3.0: is_oscillatory=True n_crossings=1885 n_peaks=1887 period_s=0.06496997425148265 freq_hz=15.391725354996264 damping_ratio=0.00010366920196650718
+
+-- sta_lta() / trigger_onset() --
+  nsta=100 nlta=1000 thr_on=3.5 thr_off=1.0
+  n_onsets=5
+    onset: 60.73s - 70.83s  (peak ratio in window: 10.00)
+    onset: 206.00s - 212.79s  (peak ratio in window: 8.64)
+    onset: 239.20s - 243.12s  (peak ratio in window: 3.55)
+    onset: 294.76s - 295.75s  (peak ratio in window: 3.78)
+    onset: 300.68s - 303.07s  (peak ratio in window: 3.96)
+
+=========== STACJA RIO (CI.RIO..HHZ) ===========
+n=36001 fs=100.0Hz start=2019-07-06T03:18:52.998300Z event_idx=6004 (t_event=60.04s)
+
+-- ringdown_resonance() --
+  noise_floor_factor=1.0: is_oscillatory=True n_crossings=235 n_peaks=236 period_s=2.258959353731953 freq_hz=0.4426817146346315 damping_ratio=-0.005676127770588659
+  noise_floor_factor=1.5: is_oscillatory=True n_crossings=224 n_peaks=226 period_s=2.408408013545369 freq_hz=0.4152120381495991 damping_ratio=-0.0066119819342227515
+  noise_floor_factor=2.0: is_oscillatory=True n_crossings=208 n_peaks=210 period_s=2.3955175756181006 freq_hz=0.4174463214873204 damping_ratio=-0.004988346276226586
+  noise_floor_factor=3.0: is_oscillatory=True n_crossings=207 n_peaks=209 period_s=2.277624457083988 freq_hz=0.43905394363401185 damping_ratio=-0.0028356087339117516
+
+-- sta_lta() / trigger_onset() --
+  nsta=100 nlta=1000 thr_on=3.5 thr_off=1.0
+  n_onsets=7
+    onset: 86.03s - 87.00s  (peak ratio in window: 3.68)
+    onset: 90.50s - 97.73s  (peak ratio in window: 8.84)
+    onset: 99.95s - 103.49s  (peak ratio in window: 5.91)
+    onset: 123.63s - 126.80s  (peak ratio in window: 3.74)
+    onset: 128.93s - 129.98s  (peak ratio in window: 3.63)
+    onset: 177.14s - 179.20s  (peak ratio in window: 3.51)
+    onset: 221.26s - 222.83s  (peak ratio in window: 4.60)
+
