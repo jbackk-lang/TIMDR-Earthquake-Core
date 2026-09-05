@@ -30,5 +30,6 @@ py-modules = [
     "catalog_core",
     "ringdown",
     "topology_features",
+    "precursor_validation",
     "cli",
 ]
