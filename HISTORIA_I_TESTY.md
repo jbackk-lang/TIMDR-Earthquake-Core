@@ -162,6 +162,18 @@ Manna-Whitneya U, nie tylko porównanie percentyli).
   Odpalenie: `pip install obspy requests scipy && python
   precursor_ringdown_test.py --mode real`.
 
+**Ten wynik jest teraz też wymuszony w kodzie, nie tylko opisany tutaj**
+(`precursor_validation.py`): `ringdown_resonance()` przy każdym wywołaniu
+przelicza ten sam test Manna-Whitneya na zamrożonych, realnych danych z
+`precursor_ringdown_test_output.json` i dołącza do swojego wyniku
+`is_validated_precursor=False`, `precursor_confidence=0.0` oraz pełny
+`precursor_validation` (p-value, effect size, powód), a przy okazji
+zgłasza `PrecursorValidationWarning`. Mechanizm jest ogólny
+(`validate_against_catalog()`/`mannwhitney_validate()`) — podstawienie
+realnie separowanych danych daje `validated=True`, więc `False` na
+katalogu USGS/EarthScope to wynik testu, nie sztywna stała. Testy w
+`test_precursor_validation.py`.
+
 **Uczciwe podsumowanie**: USGS oficjalnie stwierdza, że nikt nigdy nie
 przewidział trwale i wiarygodnie dużego trzęsienia ziemi i nie oczekuje
 takiej metody w dającej się przewidzieć przyszłości. Ten wynik (p=0.997,

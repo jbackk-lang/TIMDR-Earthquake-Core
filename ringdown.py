@@ -44,10 +44,25 @@ do 1.0-1.5 wychodzi `True` z okresem ~4-6s - bez niezależnego pomiaru
 "prawdziwej" częstotliwości tego konkretnego wstrząsu nie da się
 stwierdzić, która odpowiedź jest poprawna. To jest udokumentowane
 ograniczenie, nie ukryta wada.
+
+MASZYNOWO SPRAWDZALNY STATUS WALIDACJI (nie tylko proza w README): każdy
+wynik `ringdown_resonance()` niesie teraz `is_validated_precursor`,
+`precursor_confidence` i `precursor_validation` - status realnej,
+statystycznej walidacji tej funkcji JAKO SYGNAŁU PRECURSOR (nie jej
+matematyki ringdown, która pozostaje opisowym narzędziem post-event jak
+opisano wyżej). Ten status pochodzi z ponownego przeliczenia testu
+Manna-Whitneya z `precursor_ringdown_test.py --mode real` na zamrożonych,
+realnych danych USGS+EarthScope (`precursor_ringdown_test_output.json`)
+przy każdym wywołaniu (`precursor_validation.py`), więc automatycznie
+odzwierciedla wynik: **NIEZWALIDOWANE** (p=0.997, brak istotnej różnicy).
+Wywołanie emituje też `PrecursorValidationWarning`. Patrz
+`precursor_validation.py` i HISTORIA_I_TESTY.md po pełny mechanizm.
 """
 from __future__ import annotations
 
 import numpy as np
+
+from precursor_validation import warn_if_unvalidated
 
 
 def ringdown_resonance(
@@ -86,6 +101,15 @@ def ringdown_resonance(
     t_post = t[event_idx:end]
     d = s[event_idx:end] - baseline
 
+    # --- Precursor-signal validation status (NOT about the ringdown math
+    # itself, which stays descriptive/post-event as documented at the top
+    # of this module) - see precursor_validation.py and HISTORIA_I_TESTY.md.
+    # A "precursor" feature built on this function was tested against the
+    # real USGS catalog + real EarthScope/IRIS waveforms and REJECTED
+    # (Mann-Whitney p=0.997). Every result now carries that status
+    # explicitly instead of silently looking like a confident signal.
+    precursor_status = warn_if_unvalidated()
+
     result: dict = {
         "baseline": float(baseline),
         "noise_floor": float(noise_floor),
@@ -98,6 +122,14 @@ def ringdown_resonance(
         "damping_ratio": None,
         "peak_times": [],
         "peak_amplitudes": [],
+        # Real-data validation of ringdown_resonance() AS AN EARTHQUAKE
+        # PRECURSOR (not of the ringdown math above, which is a separate,
+        # honestly-documented descriptive/post-event tool). See
+        # precursor_validation.py / HISTORIA_I_TESTY.md for the full
+        # Mann-Whitney U test on the real USGS+EarthScope dataset.
+        "is_validated_precursor": bool(precursor_status.get("validated", False)),
+        "precursor_confidence": 1.0 if precursor_status.get("validated", False) else 0.0,
+        "precursor_validation": precursor_status,
     }
 
     if len(d) < 3:
