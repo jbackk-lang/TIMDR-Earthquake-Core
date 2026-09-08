@@ -30,6 +30,9 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 
 from timdr_core_earthquake import TIMDR_EarthquakeCore
 from seismic_loader import SeismicLoader
+from meta_adapter import build_meta_series_from_waveform, WINDOW_SECONDS as META_WINDOW_SECONDS_DEFAULT
+
+PHASE_COLORS = {"stabilna": "#43a047", "przejsciowa": "#fb8c00", "krytyczna": "#e53935"}
 
 
 # ============================================================
@@ -417,6 +420,33 @@ class TimdrEarthquakeGUI(tk.Tk):
         self.tolerance_var = tk.StringVar(value="5")
         ttk.Entry(tol_row, textvariable=self.tolerance_var, width=6).pack(side="left")
 
+        meta_frame = ttk.Labelframe(parent, text="5. Meta-dynamics (Λ/τ/ρ/J)", padding=8)
+        meta_frame.pack(fill="x", pady=(0, 8))
+
+        # WINDOW_SECONDS=5.0 (module default, see meta_adapter.py) is
+        # tuned for traces of tens-to-hundreds of seconds (Ridgecrest
+        # real demo, real CSV recordings) - the four short synthetic
+        # demos above (~4-5s total) are TOO SHORT for even one full
+        # window at this default and will show "trace too short" below
+        # rather than silently using an unstably small window: shrinking
+        # window_seconds to fit them would reintroduce the exact Lambda/
+        # rho small-window sampling-noise problem documented in
+        # TIMDR-Grid-Monitor/meta_adapter.py (PROBA 1) - not something to
+        # paper over just to make the tiny demo scenarios show a plot.
+        self.meta_window_var = tk.StringVar(value=str(META_WINDOW_SECONDS_DEFAULT))
+        self.meta_rolling_var = tk.StringVar(value="")
+        self._param_grid(meta_frame, [
+            ("Window (s):", self.meta_window_var),
+            ("Rolling hist. (s):", self.meta_rolling_var),
+        ])
+        ttk.Label(meta_frame,
+                  text="(rolling history blank = calibrate thresholds from the WHOLE trace, "
+                       "non-causal but shows full build-up/decay; set a value for causal, "
+                       "continuously-updating calibration - see build_meta_series_from_waveform "
+                       "docstring for the 3 modes)",
+                  wraplength=260, foreground="#90a4ae", font=("Segoe UI", 8)).pack(
+            fill="x", pady=(2, 0))
+
         results_frame = ttk.Labelframe(parent, text="Results", padding=8)
         results_frame.pack(fill="both", expand=True, pady=(0, 4))
         self.results_text = tk.Text(results_frame, height=14, width=34, font=("Consolas", 9),
@@ -479,8 +509,8 @@ class TimdrEarthquakeGUI(tk.Tk):
         plot_inner = ttk.Frame(plot_canvas)
         plot_inner_id = plot_canvas.create_window((0, 0), window=plot_inner, anchor="nw")
 
-        self.fig = Figure(figsize=(9.0, 13.0), dpi=100)
-        self.axes = self.fig.subplots(5, 1, sharex=True)
+        self.fig = Figure(figsize=(9.0, 15.0), dpi=100)
+        self.axes = self.fig.subplots(6, 1, sharex=True)
         self.fig.subplots_adjust(hspace=0.4, left=0.08, right=0.98, top=0.97, bottom=0.045)
         self._draw_placeholder()
 
@@ -545,7 +575,7 @@ class TimdrEarthquakeGUI(tk.Tk):
 
     def _draw_placeholder(self):
         titles = ["signal", "flow (local gradient)", "|twist|", "residual + anomalies/fronts",
-                  "STA/LTA ratio"]
+                  "STA/LTA ratio", "meta-dynamics phase (Λ/τ/ρ/J)"]
         for ax, title in zip(self.axes, titles):
             ax.clear()
             ax.set_ylabel(title, fontsize=9)
@@ -595,11 +625,15 @@ class TimdrEarthquakeGUI(tk.Tk):
             thr_on = float(self.thr_on_var.get())
             thr_off = float(self.thr_off_var.get())
             tolerance = int(self.tolerance_var.get())
+            meta_window_seconds = float(self.meta_window_var.get())
+            meta_rolling_str = self.meta_rolling_var.get().strip()
+            meta_rolling_history = float(meta_rolling_str) if meta_rolling_str else None
         except ValueError:
             messagebox.showerror(
                 "Invalid parameters",
                 "k_neighbors, twist threshold, anomaly factor, nsta, nlta, "
-                "on/off threshold and tolerance must all be numbers."
+                "on/off threshold, tolerance, meta window and meta rolling "
+                "history must all be numbers (rolling history may be left blank)."
             )
             return
 
@@ -636,15 +670,34 @@ class TimdrEarthquakeGUI(tk.Tk):
                 confirmed = core.trigger_onset(ratio, thr_on=thr_on, thr_off=thr_off)
                 rejected = []
 
+            # Meta-dynamics (Lambda/tau/rho/J) computed in its OWN try/except -
+            # a too-short trace for the chosen window (e.g. the ~4-5s
+            # synthetic demos with the default 5.0s window, see comment
+            # by meta_window_var above) must NOT abort the rest of the
+            # analysis above, which already succeeded and is independent
+            # of this.
+            try:
+                meta_result = build_meta_series_from_waveform(
+                    t, s, window_seconds=meta_window_seconds, core=core,
+                    rolling_history_seconds=meta_rolling_history,
+                )
+                meta_error = None
+            except ValueError as exc:
+                meta_result = None
+                meta_error = str(exc)
+
             self._plot_results(t, s, flow_grad, twist_strength, twist_pts, residuals,
                                 anomaly_pts, fronts, twist_thr, ratio, confirmed, rejected,
-                                thr_on, thr_off, events, smooth_preview, hybrid_enabled)
+                                thr_on, thr_off, events, smooth_preview, hybrid_enabled,
+                                meta_result, meta_window_seconds)
             self._show_results(t, twist_pts, anomaly_pts, fronts, th, confirmed, rejected,
-                                events, hybrid_enabled)
+                                events, hybrid_enabled, meta_result, meta_error)
             self.status_var.set(
                 f"Analysis done: {len(twist_pts)} twist pts, {len(anomaly_pts)} anomalies, "
                 f"{len(fronts)} fronts, {len(confirmed)} STA/LTA "
                 f"{'confirmed' if hybrid_enabled else 'triggers'}."
+                + (f" Meta-dynamics: {len(meta_result.phases)} windows."
+                   if meta_result is not None else " Meta-dynamics: trace too short.")
             )
         except Exception:
             messagebox.showerror("Analysis error", traceback.format_exc(limit=3))
@@ -652,7 +705,7 @@ class TimdrEarthquakeGUI(tk.Tk):
     # ------------------------------------------------------------
     def _plot_results(self, t, s, flow_grad, twist_strength, twist_pts, residuals, anomaly_pts,
                        fronts, twist_thr, ratio, confirmed, rejected, thr_on, thr_off, events,
-                       smooth_preview, hybrid_enabled):
+                       smooth_preview, hybrid_enabled, meta_result, meta_window_seconds):
         for ax in self.axes:
             ax.clear()
             ax.grid(alpha=0.2)
@@ -707,13 +760,37 @@ class TimdrEarthquakeGUI(tk.Tk):
                                       label="rejected" if k_evt == 0 else None)
         self.axes[4].legend(fontsize=7, loc="upper right")
         self.axes[4].set_ylabel("STA/LTA", fontsize=9)
-        self.axes[4].set_xlabel("time (s)")
+
+        # Meta-dynamics phase timeline - one colored axvspan per window,
+        # same coloring convention (green/orange/red = stabilna/
+        # przejsciowa/krytyczna) as the other TIMDR-META-DYNAMICS
+        # dashboards in this ecosystem (Grid-Monitor/Industrial-Predict).
+        if meta_result is not None and len(meta_result.phases):
+            seen_phases = set()
+            for i, phase in enumerate(meta_result.phases):
+                w_start = meta_result.window_starts[i]
+                w_end = w_start + meta_window_seconds
+                color = PHASE_COLORS.get(phase, "#9e9e9e")
+                self.axes[5].axvspan(w_start, w_end, color=color, alpha=0.35,
+                                      label=phase if phase not in seen_phases else None)
+                seen_phases.add(phase)
+            if seen_phases:
+                self.axes[5].legend(fontsize=7, loc="upper right")
+            self.axes[5].set_ylim(0, 1)
+            self.axes[5].set_yticks([])
+        else:
+            self.axes[5].text(0.5, 0.5, "trace too short for chosen window (see status bar)",
+                               transform=self.axes[5].transAxes, ha="center", va="center",
+                               fontsize=8, color="#90a4ae")
+            self.axes[5].set_yticks([])
+        self.axes[5].set_ylabel("meta phase", fontsize=9)
+        self.axes[5].set_xlabel("time (s)")
 
         self.fig.suptitle("")
         self.canvas.draw()
 
     def _show_results(self, t, twist_pts, anomaly_pts, fronts, threshold, confirmed, rejected,
-                       events, hybrid_enabled):
+                       events, hybrid_enabled, meta_result, meta_error):
         lines = []
         lines.append(f"Samples: {len(t)}")
         lines.append(f"Time range: {t[0]:.3f} - {t[-1]:.3f} s")
@@ -757,6 +834,22 @@ class TimdrEarthquakeGUI(tk.Tk):
                 lines.append(f"  last:  t={t[i_start]:.3f}s -> {t[i_end]:.3f}s (idx={i_start}-{i_end})")
         else:
             lines.append("  (no triggers - check on/off thresholds or nsta/nlta)")
+
+        lines.append("")
+        lines.append("Meta-dynamics (Lambda/tau/rho/J, see meta_adapter.py):")
+        if meta_result is None:
+            lines.append(f"  not computed - {meta_error}")
+        else:
+            counts = {}
+            for p in meta_result.phases:
+                counts[p] = counts.get(p, 0) + 1
+            breakdown = ", ".join(f"{k}={v}" for k, v in sorted(counts.items())) or "(no windows)"
+            lines.append(f"  windows: {len(meta_result.phases)}  ({breakdown})")
+            trig = meta_result.trigger
+            if trig.triggered:
+                lines.append(f"  trigger: {trig.message}")
+            else:
+                lines.append("  trigger: none (phase never left 'stabilna', or too few windows)")
 
         self.results_text.configure(state="normal")
         self.results_text.delete("1.0", "end")

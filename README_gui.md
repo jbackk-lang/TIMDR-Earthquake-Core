@@ -35,9 +35,39 @@ podpisy na wykresach) jest teraz w języku angielskim.
 - **Run analysis** — pełny pipeline: flow → twist → anomalie →
   `classify_anomalies` (kształt: impuls/spike/step/drift/dropout,
   kolorowane osobno na wykresie residuum) → fronty → STA/LTA (zwykły
-  lub hybrydowy). Wynik jako 5-panelowy wykres i panel tekstowy z
-  liczbami, w tym rozkładem typów anomalii i (przy hybrydzie) liczbą
-  potwierdzeń/odrzuceń.
+  lub hybrydowy) → meta-dynamika (patrz niżej). Wynik jako 6-panelowy
+  wykres i panel tekstowy z liczbami, w tym rozkładem typów anomalii i
+  (przy hybrydzie) liczbą potwierdzeń/odrzuceń.
+- **Meta-dynamics (Λ/τ/ρ/J)** — 6. panel wykresu, korzysta wprost z
+  `meta_adapter.py` (ten sam moduł, którego `build_meta_series_from_waveform`
+  jest reużywane przez sibling-import w TIMDR-Grid-Monitor/
+  TIMDR-Industrial-Predict/Synoptyk-v3 — patrz ich odpowiednie
+  `meta_adapter.py`). Dwa pola: **Window (s)** (domyślnie `5.0`, jak
+  moduł) i **Rolling hist. (s)** (puste = progi liczone z CAŁEGO śladu,
+  niecałkowicie przyczynowe, ale pokazujące pełne narastanie-i-zanik;
+  wartość = tryb przyczynowy, aktualizujący się w czasie — patrz
+  docstring `build_meta_series_from_waveform`). Fazy (stabilna/
+  przejściowa/krytyczna) rysowane jako kolorowe pasy na osi czasu.
+
+  **Uczciwe ograniczenie zweryfikowane przy budowie tego panelu**:
+  cztery krótkie scenariusze syntetyczne (~4-5s przy domyślnym oknie
+  5.0s) są ZA KRÓTKIE na choćby jedno pełne okno — panel pokazuje
+  wtedy czytelny komunikat "trace too short for chosen window" zamiast
+  wykresu, i **nie** przerywa reszty analizy (pozostałe 5 paneli
+  liczą się normalnie, błąd złapany osobno). Zmniejszenie okna, żeby
+  "zmieściło się" w te 4-5s, przywróciłoby dokładnie ten sam problem
+  udokumentowany w `TIMDR-Grid-Monitor/meta_adapter.py` (PRÓBA 1): na
+  bardzo krótkich oknach próbka Λ (frakcja FFT wysokich częstotliwości)
+  ma tak dużą wariancję, że fałszywie klasyfikuje czysty szum jako
+  "przejściowa"/"krytyczna" — świadomie NIE zrobiono tego tutaj.
+  Scenariusz **Ridgecrest 2019** (90s, fs=100Hz) jest wystarczająco
+  długi i daje sensowny, sprawdzony wynik: pierwsze ~20s po głównym
+  wstrząsie (M7.1, t=0) wychodzi "krytyczna" (4 kolejne okna), potem
+  faza opada do "przejściowa"/"stabilna" w miarę zanikania sekwencji
+  wstrząsów wtórnych w oknie kalibracji z całego śladu — fizycznie
+  sensowny kierunek (krytyczna tuż po dużym zdarzeniu, potem uspokojenie),
+  choć progi klasyfikacji (0.1/1.0) same w sobie NIE są skalibrowane na
+  danych sejsmicznych (patrz zastrzeżenia w nagłówku `meta_adapter.py`).
 
 ## Pięć scenariuszy demo
 
