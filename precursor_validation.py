@@ -32,21 +32,47 @@ hardcodes the dataset location, the statistical test, and the
 significance/effect-size decision rule, exactly like `precursor_ringdown_test.py`
 already did for the one-off script version of this same comparison.
 
-No hard scipy dependency: `_mannwhitney_u_p()` below is a pure
-numpy/stdlib implementation of the two-sided Mann-Whitney U test (normal
-approximation with tie correction, matching scipy's `mannwhitneyu` to
-several decimal places at these sample sizes). This mirrors the repo's
-existing precaution around module-level scipy imports (see
-HISTORIA_I_TESTY.md: `savgol_filter` at module scope crashed the whole
-GUI on a machine where Windows Device Guard blocked scipy's DLLs, even
-for callers who never used that code path) - this guard runs on every
-`ringdown_resonance()` call, so it must not risk the same failure mode.
+No hard scipy dependency for the actual test: this module sibling-imports
+`mann_whitney_test(..., backend="numpy")` from
+`TIMDR-Math-Formalism/timdr_formalism/pipeline.py` instead of keeping its
+own copy of the pure numpy/stdlib Mann-Whitney U implementation this
+module originally had. UPDATE (2026-09-08): that local implementation
+(`_mannwhitney_u_p`) was a THIRD, independent copy of the same math
+already living twice in this ecosystem (TIMDR-Math-Formalism's
+`pipeline.py` protocol, and this file) - now consolidated into ONE
+canonical definition in `pipeline.py` (see that file's header for the
+Device Guard story this guard is itself named after), which this module
+now calls via the sibling-repo import pattern used throughout this
+ecosystem (see `_ensure_timdr_math_formalism_on_path()` below - same
+pattern as `meta_adapter.py`'s `_ensure_timdr_meta_dynamics_on_path()`).
+This mirrors the repo's existing precaution around module-level scipy
+imports (see HISTORIA_I_TESTY.md: `savgol_filter` at module scope
+crashed the whole GUI on a machine where Windows Device Guard blocked
+scipy's DLLs, even for callers who never used that code path) - this
+guard runs on every `ringdown_resonance()` call, so it must not risk the
+same failure mode. `pipeline.py` itself now wraps its own `scipy` import
+in `try/except` (same fix, applied at the canonical source), so
+importing it at all is safe even when scipy is broken; `backend="numpy"`
+below additionally guarantees the actual U-test computation never
+touches scipy at call time either, matching this module's original
+guarantee exactly.
+
+NOTE ON EFFECT SIZE SIGN CONVENTION: `pipeline.py`'s `rank_biserial_effect_size`
+uses `r = 2*U/(n_test*n_background) - 1` (r>0 means the FIRST/test group
+has higher values) - the opposite sign convention from this module's
+former self-computed `effect_r = 1.0 - 2*U/(n1*n2)`. This only ever
+flows into `abs(effect_r) >= min_effect_size_r` (magnitude) and a
+separately-computed `mean_a > mean_b` (direction) below, never into a
+sign-dependent comparison, so the switch is behavior-preserving for
+`mannwhitney_validate()`'s pass/fail logic - only the raw number in the
+returned dict's `effect_size_r` field flips sign (now matches
+`pipeline.py`'s convention, arguably the more intuitive one).
 """
 from __future__ import annotations
 
 import json
-import math
 import os
+import sys
 import warnings
 from functools import lru_cache
 
@@ -66,51 +92,26 @@ class PrecursorValidationWarning(UserWarning):
     validation as an earthquake precursor. See HISTORIA_I_TESTY.md."""
 
 
-def _mannwhitney_u_p(a: np.ndarray, b: np.ndarray) -> tuple[float, float]:
-    """Two-sided Mann-Whitney U test, pure numpy/stdlib (no scipy).
-    Returns (U for group a, two-sided p-value), normal approximation with
-    tie correction - no continuity correction, which is the same
-    convention scipy.stats.mannwhitneyu uses for method='asymptotic'.
-    """
-    a = np.asarray(a, dtype=float)
-    b = np.asarray(b, dtype=float)
-    n1, n2 = len(a), len(b)
-    all_vals = np.concatenate([a, b])
-    n = len(all_vals)
+def _ensure_timdr_math_formalism_on_path() -> None:
+    """Adds the sibling TIMDR-Math-Formalism folder to sys.path - same
+    pattern as `meta_adapter.py`'s `_ensure_timdr_meta_dynamics_on_path()`
+    and `bearing_meta_adapter.py`'s `_ensure_siblings_on_path()` in
+    TIMDR-Industrial-Predict. TIMDR-Earthquake-Core sits directly in the
+    parent directory, so the sibling is exactly one level up."""
+    here = os.path.dirname(os.path.abspath(__file__))
+    sibling = os.path.abspath(os.path.join(here, "..", "TIMDR-Math-Formalism"))
+    if not os.path.isdir(sibling):
+        raise ImportError(
+            "precursor_validation wymaga folderu 'TIMDR-Math-Formalism' jako "
+            f"siostry repo TIMDR-Earthquake-Core (szukano w: {sibling})."
+        )
+    if sibling not in sys.path:
+        sys.path.insert(0, sibling)
 
-    order = np.argsort(all_vals, kind="mergesort")
-    sorted_vals = all_vals[order]
-    ranks = np.empty(n, dtype=float)
-    i = 0
-    rank_cursor = 1
-    while i < n:
-        j = i
-        while j + 1 < n and sorted_vals[j + 1] == sorted_vals[i]:
-            j += 1
-        avg_rank = (rank_cursor + rank_cursor + (j - i)) / 2.0
-        ranks[order[i:j + 1]] = avg_rank
-        rank_cursor += (j - i + 1)
-        i = j + 1
 
-    r1 = float(ranks[:n1].sum())
-    u1 = r1 - n1 * (n1 + 1) / 2.0
+_ensure_timdr_math_formalism_on_path()
 
-    mu = n1 * n2 / 2.0
-    _, counts = np.unique(all_vals, return_counts=True)
-    tie_term = float(np.sum(counts.astype(float) ** 3 - counts.astype(float)))
-    if n > 1:
-        sigma2 = (n1 * n2 / 12.0) * ((n + 1) - tie_term / (n * (n - 1)))
-    else:
-        sigma2 = 0.0
-    sigma = math.sqrt(sigma2) if sigma2 > 0 else 0.0
-
-    if sigma == 0:
-        # degenerate (e.g. all values identical) - no evidence of a difference
-        return u1, 1.0
-
-    z = (u1 - mu) / sigma
-    p = math.erfc(abs(z) / math.sqrt(2.0))  # two-sided normal p-value
-    return u1, min(1.0, p)
+from timdr_formalism.pipeline import mann_whitney_test as _mann_whitney_test  # noqa: E402
 
 
 def mannwhitney_validate(
@@ -149,9 +150,10 @@ def mannwhitney_validate(
             ),
         }
 
-    u1, p = _mannwhitney_u_p(a, b)
+    test_result = _mann_whitney_test(a, b, backend="numpy")
+    p = test_result.pvalue
+    effect_r = test_result.effect_size_r
     n1, n2 = len(a), len(b)
-    effect_r = 1.0 - (2.0 * u1) / (n1 * n2)
     mean_a, mean_b = float(np.mean(a)), float(np.mean(b))
 
     significant = p < alpha

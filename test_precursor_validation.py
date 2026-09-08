@@ -86,6 +86,11 @@ def test_cached_status_jest_niezwalidowany():
 # ---------------------------------------------------------------------
 
 def test_mannwhitney_u_p_zgodny_ze_scipy_gdy_dostepne():
+    """`_mann_whitney_test` sibling-importowany z
+    TIMDR-Math-Formalism/timdr_formalism/pipeline.py (patrz naglowek
+    modulu - to teraz JEDYNE miejsce definicji tej matematyki, nie
+    kopia lokalna) - `backend='numpy'` musi dawac wynik zgodny ze
+    scipy, tak jak dawala poprzednia, lokalna implementacja."""
     scipy_stats = pytest.importorskip("scipy.stats")
     rng = np.random.default_rng(0)
     a = rng.normal(0, 1, 40)
@@ -93,11 +98,11 @@ def test_mannwhitney_u_p_zgodny_ze_scipy_gdy_dostepne():
     a = np.round(a, 2)
     b = np.round(b, 2)
 
-    u_mine, p_mine = pv._mannwhitney_u_p(a, b)
+    mine = pv._mann_whitney_test(a, b, backend="numpy")
     u_scipy, p_scipy = scipy_stats.mannwhitneyu(a, b, alternative="two-sided")
 
-    assert u_mine == pytest.approx(u_scipy, abs=1e-6)
-    assert p_mine == pytest.approx(p_scipy, abs=0.01)
+    assert mine.statistic == pytest.approx(u_scipy, abs=1e-6)
+    assert mine.pvalue == pytest.approx(p_scipy, abs=0.01)
 
 
 # ---------------------------------------------------------------------
