@@ -88,6 +88,55 @@ dają w tej formie:
    kulturę pre-rejestracji i kontroli negatywnej; dobra baza do
    sprawdzania kolejnych pomysłów, zanim trafią na prawdziwe dane.
 
+## Integracja z TIMDR-META-DYNAMICS (eksperymentalna)
+
+`meta_adapter.py` okienkuje ciągły ślad `s(t)` (domyślnie 5s, nienakładające
+się okna) i mapuje wynik `flow()`/`twist()`/`anomalies()`/`trm()` na
+`MetaState(Λ,τ,ρ,J)` z repozytorium-siostry `TIMDR-META-DYNAMICS` — trzecia
+realna integracja tego formalizmu (pierwsza: finansowa w
+`analizator-gieldowy-v3`, druga: pogodowa w `Synoptyk-v3`).
+
+**Mapowanie** (Λ=high-frequency fraction widma amplitudy w oknie [0,1],
+τ=średni `|flow_grad|`/próg globalny, ρ=fraction próbek-anomalii wg progu
+globalnego, J=fraction próbek-"skrętu" wg progu globalnego) zaprojektowane
+od razu jako bezwymiarowe — pełne wzory i dwie odrzucone/zaakceptowane
+wersje w docstringu pliku.
+
+**Test end-to-end na PRAWDZIWYM śladzie** (Ridgecrest 2019, stacja CLC,
+360s, znany niezależnie czas mainshocku t≈60.0s — `HISTORIA_I_TESTY.md`):
+z progami kalibrowanymi na **całym** śladzie, klasyfikacja faz poprawnie
+wychwytuje mainshock (pierwsza faza `"krytyczna"` w kroku obejmującym
+t≈60s) i pokazuje realny zanik aktywności w ciągu ~90s po zdarzeniu.
+
+**Znaleziony i naprawiony błąd (V1→V2, patrz docstring)**: pierwsza wersja
+normalizowała każde okno względem samego siebie (mediana+MAD *tego samego*
+okna) — algebraicznie niezmiennicze na jednorodne przeskalowanie, więc
+τ wychodził niemal identyczny (~0.3) na całym śladzie, *w tym w oknie z
+mainshockiem* — zero mocy dyskryminującej. Naprawione przez policzenie
+progów **raz, globalnie**, przed podziałem na okna.
+
+**Zbadana (nie porzucona) kwestia obiegowości kalibracji**: czy liczenie
+progu z całego śladu (włącznie z samym zdarzeniem) nie jest ukrytym
+"przejściem między dwoma reżimami" w jednej statystyce — dokładnie ten sam
+problem, jaki ten projekt już raz znalazł gdzie indziej (patrz niżej,
+"kalibracja nie może być na oknie, które już zawiera rój"). Odpowiedź:
+tak, pre-event i post-event to naprawdę drastycznie różne reżimy
+(zweryfikowane na surowych danych — odch. std. amplitudy skacze z ~9 400
+do ~2-5 mln i zostaje ~40× podwyższone nawet 3-5 min później — to realna
+fizyka silnego wstrząsu + sekwencji wstrząsów wtórnych, nie artefakt
+przetwarzania). `build_meta_series_from_waveform(calibration_end=...)`
+udostępnia oba warianty (kalibracja z całego śladu vs. wyłącznie z okresu
+przed zdarzeniem) — wariant przyczynowy na tym śladzie daje wynik niemal
+binarny (>50% kroków "krytyczna" przez całą resztę zapisu), bo cała
+sekwencja wstrząsów wtórnych jest ekstremalna względem spokojnego tła.
+Oba warianty zostają w kodzie, żaden nie zastępuje drugiego — odpowiadają
+na różne pytania ("jak ewoluuje aktywność w obrębie zdarzenia" vs. "czy
+jestem już w reżimie po-katastroficznym").
+
+Test: `test_meta_adapter.py` (7 testów: kontrole syntetyczne
+pozytywna/negatywna, dowód algebraiczny błędu V1, walidacja wejścia, oba
+warianty end-to-end na realnym śladzie).
+
 ## Ograniczenia (zwięźle — pełne dowody w `HISTORIA_I_TESTY.md`)
 
 - Jeden kanał `s(t)` — brak lokalizacji, magnitud, rozróżnienia P/S.
