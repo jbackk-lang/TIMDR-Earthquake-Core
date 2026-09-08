@@ -201,6 +201,57 @@ def test_causal_calibration_end_variant_on_real_data_saturates_post_event():
         assert math_isfinite_all(st)
 
 
+@pytest.mark.skipif(not os.path.exists(REAL_CSV), reason="brak pliku z realnymi danymi CLC_HHZ.csv")
+def test_rolling_calibration_variant_on_real_data_is_causal_and_discriminates():
+    """Wariant KROCZACY (rolling_history_seconds=30.0) - trzecia opcja,
+    posrednia miedzy 'caly slad' (nieprzyczynowa, ale pokazuje zanik) i
+    'stale sprzed zdarzenia' (przyczynowa, ale nasyca sie na zawsze).
+    Real wynik na tym samym sladzie: przyczynowy JAK (2), ale
+    dyskryminuje w czasie JAK (1) - wychwytuje mainshock (pierwsza
+    'krytyczna' w poblizu t~=60s) I WRACA do 'stabilna' po jego zaniku,
+    zamiast zostac zablokowany w 'krytyczna' do konca zapisu."""
+    import warnings
+    from seismic_loader import SeismicLoader
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        loader = SeismicLoader()
+        t, s = loader.load_csv(REAL_CSV)
+
+    result = build_meta_series_from_waveform(
+        t, s, window_seconds=WINDOW_SECONDS, rolling_history_seconds=30.0
+    )
+
+    for st in result.states:
+        assert math_isfinite_all(st)
+
+    # Dyskryminuje (nie wszystko ta sama faza).
+    assert len(set(result.phases)) > 1
+
+    # Pierwsza 'krytyczna' w poblizu realnego, niezaleznie ustalonego
+    # czasu mainshocku (t~=60.0s), tolerancja 2 okna.
+    assert result.trigger.triggered
+    idx = result.trigger.location
+    t_trigger_window_end = result.window_starts[idx + 1]
+    assert abs(t_trigger_window_end - 60.0) <= 10.0
+
+    # Kluczowa rozniznica wzgledem wariantu (2): NIE zostaje zablokowany
+    # w 'krytyczna' do konca - musi wrocic do czegos lagodniejszego
+    # (stabilna/przejsciowa) w drugiej polowie zapisu, bo referencja sie
+    # zaktualizowala.
+    second_half = result.phases[len(result.phases) // 2:]
+    assert "stabilna" in second_half or "przejsciowa" in second_half
+
+
+def test_calibration_end_and_rolling_history_are_mutually_exclusive():
+    t = np.arange(0.0, 30.0, 0.01)
+    s = np.random.default_rng(0).normal(size=len(t))
+    with pytest.raises(ValueError):
+        build_meta_series_from_waveform(
+            t, s, window_seconds=5.0, calibration_end=10.0, rolling_history_seconds=10.0
+        )
+
+
 def math_isfinite_all(state) -> bool:
     import math
     return all(math.isfinite(v) for v in (state.Lambda, state.tau, state.rho, state.J))

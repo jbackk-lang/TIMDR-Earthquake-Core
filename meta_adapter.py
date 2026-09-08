@@ -146,6 +146,22 @@ UCZCIWE ZASTRZEZENIA:
      Zaden wariant nie zostal porzucony na rzecz drugiego - oba zostaja w
      kodzie (`calibration_end` parametr), z tym zastrzezeniem widocznym
      w obu miejscach.
+  7. TRZECI WARIANT (2026-09-08, `rolling_history_seconds`) - dodany, zeby
+     rozwiazac SZTYWNOSC wariantu (b) z #6: `calibration_end` liczy prog
+     RAZ i zamraza go na reszte sladu, wiec na Ridgecrest 2019 nigdy nie
+     "zapomina" mainshocku (56/67 krokow "krytyczna" do samego konca).
+     `rolling_history_seconds` przelicza prog PRZED KAZDYM oknem z
+     probek WYLACZNIE sprzed tego okna (trailing window) - PRZYCZYNOWE
+     jak (b), ale AKTUALIZUJACE SIE jak (a) - koncepcyjnie identyczne z
+     LTA w `core.sta_lta()` w TYM SAMYM repo. Na realnym sladzie z
+     rolling_history_seconds=30.0: pierwsza "krytyczna" pada dokladnie w
+     oknie mainshocku (t=60s), a druga polowa zapisu poprawnie wraca do
+     "stabilna"/"przejsciowa" (rozklad faz:
+     {'krytyczna': 5, 'przejsciowa': 11, 'stabilna': 49}) - najlepszy z
+     trzech wynikow na tym sladzie, ZALECANY domyslny wybor dla realnej,
+     ciaglej detekcji. Zaden z trzech wariantow (a/b/rolling) nie zastepuje
+     pozostalych - kazdy zostaje w kodzie, bo kazdy odpowiada na inne
+     pytanie (patrz #6 i docstring `build_meta_series_from_waveform`).
 ===========================================================================
 """
 from __future__ import annotations
@@ -338,57 +354,61 @@ def build_meta_series_from_waveform(
     core: Optional[TIMDR_EarthquakeCore] = None,
     dt: Optional[float] = None,
     calibration_end: Optional[float] = None,
+    rolling_history_seconds: Optional[float] = None,
 ) -> SeismicMetaResult:
     """Dzieli (t,s) na kolejne, NIENAKLADAJACE SIE okna dlugosci
     `window_seconds`, liczy MetaState per okno, potem M-serie/fazy/trigger.
 
-    `dt` (czas miedzy kolejnymi OKNAMI, nie probkami) domyslnie =
-    window_seconds - okna sa wprost sasiadujace, wiec to najbardziej
-    dosłowna interpretacja "jeden krok czasu miedzy stanami".
+    Trzy WZAJEMNIE WYKLUCZAJACE SIE tryby kalibracji progow (dokladnie
+    jeden parametr moze byc ustawiony - podanie obu naraz to ValueError,
+    zeby nie zgadywac ktory ma pierwszenstwo):
 
-    `calibration_end` (domyslnie None = kalibruj na CALYM sladzie) -
-    jesli podane, progi globalne sa liczone WYLACZNIE z probek
-    `t < calibration_end`, a stosowane do WSZYSTKICH okien (rowniez
-    tych po `calibration_end`). To jest przyczynowy/"online-bezpieczny"
-    wariant kalibracji (patrz uzasadnienie i realny wynik na Ridgecrest
-    2019 w docstringu `compute_global_thresholds`) - NIE domyslny, bo
-    wymaga znajomosci, KIEDY konczy sie "spokojny" okres referencyjny,
-    czego adapter sam z siebie nie zgaduje. Oba warianty sa
-    rownoprawne/oba zachowane (patrz zastrzezenie #5/#6) - zaden nie
-    zastepuje drugiego.
+    (1) domyslny (`calibration_end=None`, `rolling_history_seconds=None`)
+        - progi z CALEGO sladu. Patrz (a) w docstringu
+        `compute_global_thresholds` - NIE przyczynowy (lookahead), ale
+        pokazuje pelna strukture narastanie-i-zanik.
+
+    (2) `calibration_end=<czas>` - progi WYLACZNIE z `t < calibration_end`,
+        STALE dla calej reszty sladu. Patrz (b) - przyczynowy, ale na
+        realnym Ridgecrest 2019 daje wynik niemal binarny (nigdy nie
+        "zapomina" mainshocku, bo referencja nigdy sie nie aktualizuje).
+
+    (3) `rolling_history_seconds=<sekundy>` - progi PRZELICZANE OD NOWA
+        dla KAZDEGO okna, z probek w przedziale
+        `[w_start - rolling_history_seconds, w_start)` (WYLACZNIE
+        PRZESZLOSC wzgledem tego okna - przyczynowe, jak (2), ale
+        AKTUALIZUJACE SIE w czasie zamiast zamrozone raz na starcie).
+        Koncepcyjnie to DOKLADNIE ten sam pomysl co LTA (long-term
+        average) w `core.sta_lta()` w TYM SAMYM repo - roczaca sie
+        referencja "co jest typowe TERAZ", nie "co bylo typowe na
+        poczatku zapisu". Okna, dla ktorych nie ma jeszcze
+        `rolling_history_seconds` historii (pierwsze okna sladu), sa
+        POMIJANE (nie da sie ich przyczynowo skalibrowac) - podobnie jak
+        `core.sta_lta()` zwraca 0 dla pierwszych `nlta-1` probek zamiast
+        zgadywac z niepelnego okna.
+
+    `dt` (czas miedzy kolejnymi OKNAMI, nie probkami) domyslnie =
+    window_seconds - okna sa wprost sasiadujace.
 
     Ostatnie, niepelne okno (gdy dlugosc sladu nie jest calkowita
-    wielokrotnoscia window_seconds) jest ODRZUCANE, nie dopelniane -
-    niepelne okno mialoby inna liczbe probek niz reszta, co
-    zaburzyloby porownywalnosc statystyk robust (mediana/MAD) miedzy
-    oknami."""
+    wielokrotnoscia window_seconds) jest ODRZUCANE, nie dopelniane."""
     t = np.asarray(t, dtype=np.float64)
     s = np.asarray(s, dtype=np.float64)
     if len(t) != len(s):
         raise ValueError(f"t i s musza miec ta sama dlugosc, dostano {len(t)} i {len(s)}")
     if len(t) < 2:
         raise ValueError("Potrzeba >= 2 probek")
+    if calibration_end is not None and rolling_history_seconds is not None:
+        raise ValueError(
+            "calibration_end i rolling_history_seconds sa wzajemnie "
+            "wykluczajace - podaj co najwyzej jedno (patrz docstring, "
+            "tryby 2 i 3)."
+        )
 
     if core is None:
         core = TIMDR_EarthquakeCore()
     if dt is None:
         dt = window_seconds
-
-    # Progi GLOBALNE - domyslnie z calego sladu, albo (calibration_end
-    # podane) wylacznie z okresu referencyjnego SPRZED tego czasu -
-    # zawsze PRZED podzieleniem na okna, przed policzeniem
-    # jakiegokolwiek MetaState/M-serii. Patrz GlobalThresholds/NAPRAWA V2
-    # i uwaga (a)/(b) w docstringu compute_global_thresholds.
-    if calibration_end is None:
-        thresholds = compute_global_thresholds(core, t, s)
-    else:
-        calib_mask = t < calibration_end
-        if calib_mask.sum() < 4:
-            raise ValueError(
-                f"calibration_end={calibration_end} zostawia tylko "
-                f"{int(calib_mask.sum())} probek referencyjnych (< 4)."
-            )
-        thresholds = compute_global_thresholds(core, t[calib_mask], s[calib_mask])
 
     t0 = t[0]
     duration = t[-1] - t0
@@ -401,15 +421,50 @@ def build_meta_series_from_waveform(
 
     window_starts: List[float] = []
     states: List[MetaState] = []
-    for i in range(n_windows):
-        w_start = t0 + i * window_seconds
-        w_end = w_start + window_seconds
-        mask = (t >= w_start) & (t < w_end)
-        t_win, s_win = t[mask], s[mask]
-        if len(t_win) < 4:
-            continue
-        window_starts.append(w_start)
-        states.append(window_to_meta_state(core, t_win, s_win, thresholds))
+
+    if rolling_history_seconds is None:
+        # Tryb (1) lub (2): JEDEN wspolny prog dla wszystkich okien,
+        # policzony PRZED petla po oknach.
+        if calibration_end is None:
+            thresholds = compute_global_thresholds(core, t, s)
+        else:
+            calib_mask = t < calibration_end
+            if calib_mask.sum() < 4:
+                raise ValueError(
+                    f"calibration_end={calibration_end} zostawia tylko "
+                    f"{int(calib_mask.sum())} probek referencyjnych (< 4)."
+                )
+            thresholds = compute_global_thresholds(core, t[calib_mask], s[calib_mask])
+
+        for i in range(n_windows):
+            w_start = t0 + i * window_seconds
+            w_end = w_start + window_seconds
+            mask = (t >= w_start) & (t < w_end)
+            t_win, s_win = t[mask], s[mask]
+            if len(t_win) < 4:
+                continue
+            window_starts.append(w_start)
+            states.append(window_to_meta_state(core, t_win, s_win, thresholds))
+    else:
+        # Tryb (3): prog PRZELICZANY per okno, z trailing historii PRZED
+        # tym oknem - zadne okno nie widzi wlasnych ani przyszlych probek
+        # w swoim wlasnym progu.
+        for i in range(n_windows):
+            w_start = t0 + i * window_seconds
+            w_end = w_start + window_seconds
+            hist_start = w_start - rolling_history_seconds
+            if hist_start < t0:
+                continue  # za malo historii sprzed tego okna - pomin (jak core.sta_lta() dla niepelnego LTA)
+            hist_mask = (t >= hist_start) & (t < w_start)
+            if hist_mask.sum() < 4:
+                continue
+            window_mask = (t >= w_start) & (t < w_end)
+            t_win, s_win = t[window_mask], s[window_mask]
+            if len(t_win) < 4:
+                continue
+            thresholds_i = compute_global_thresholds(core, t[hist_mask], s[hist_mask])
+            window_starts.append(w_start)
+            states.append(window_to_meta_state(core, t_win, s_win, thresholds_i))
 
     if len(states) < 2:
         raise ValueError(f"Za malo pelnych okien z wystarczajaca liczba probek ({len(states)} < 2)")

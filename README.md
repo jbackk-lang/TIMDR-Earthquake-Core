@@ -32,7 +32,7 @@ print(confirmed)
 "
 
 python gui_app.py            # interfejs graficzny (run.bat na Windows)
-pytest -q                    # 68 testów
+pytest -q                    # 92 testy
 ```
 
 ## Czym to jest w porównaniu z innymi narzędziami
@@ -115,27 +115,50 @@ okna) — algebraicznie niezmiennicze na jednorodne przeskalowanie, więc
 mainshockiem* — zero mocy dyskryminującej. Naprawione przez policzenie
 progów **raz, globalnie**, przed podziałem na okna.
 
-**Zbadana (nie porzucona) kwestia obiegowości kalibracji**: czy liczenie
-progu z całego śladu (włącznie z samym zdarzeniem) nie jest ukrytym
-"przejściem między dwoma reżimami" w jednej statystyce — dokładnie ten sam
-problem, jaki ten projekt już raz znalazł gdzie indziej (patrz niżej,
-"kalibracja nie może być na oknie, które już zawiera rój"). Odpowiedź:
-tak, pre-event i post-event to naprawdę drastycznie różne reżimy
-(zweryfikowane na surowych danych — odch. std. amplitudy skacze z ~9 400
-do ~2-5 mln i zostaje ~40× podwyższone nawet 3-5 min później — to realna
-fizyka silnego wstrząsu + sekwencji wstrząsów wtórnych, nie artefakt
-przetwarzania). `build_meta_series_from_waveform(calibration_end=...)`
-udostępnia oba warianty (kalibracja z całego śladu vs. wyłącznie z okresu
-przed zdarzeniem) — wariant przyczynowy na tym śladzie daje wynik niemal
-binarny (>50% kroków "krytyczna" przez całą resztę zapisu), bo cała
-sekwencja wstrząsów wtórnych jest ekstremalna względem spokojnego tła.
-Oba warianty zostają w kodzie, żaden nie zastępuje drugiego — odpowiadają
-na różne pytania ("jak ewoluuje aktywność w obrębie zdarzenia" vs. "czy
-jestem już w reżimie po-katastroficznym").
+**Ustalenie (priorytetowe — odpowiedź na pytanie "który wariant kalibracji
+używać")**: z trzech dostępnych trybów, **kroczący (`rolling_history_seconds`)
+działa realnie najlepiej na tym śladzie**, bo jest jednocześnie PRZYCZYNOWY
+(jak `calibration_end` — próg liczony wyłącznie z przeszłości względem
+każdego okna) i ADAPTACYJNY (jak wariant całościowy — próg "zapomina" stare
+zdarzenie zamiast zostać przy nim zamrożony na zawsze). Koncepcyjnie to
+dokładnie ten sam pomysł co LTA (long-term average) już używane w
+`core.sta_lta()` w tym samym repo — referencja "co jest typowe TERAZ" zamiast
+"co było typowe na starcie zapisu". Na realnym śladzie Ridgecrest 2019 z
+`rolling_history_seconds=30.0`: pierwsza faza "krytyczna" pada dokładnie w
+oknie obejmującym mainshock (t=60s), a już w drugiej połowie zapisu system
+poprawnie wraca do "stabilna"/"przejściowa" — rozkład faz
+`{'krytyczna': 5, 'przejściowa': 11, 'stabilna': 49}`. Żaden z trzech
+wariantów nie został usunięty — `calibration_end` i wariant całościowy
+zostają w kodzie jako odpowiedzi na inne pytania (patrz niżej), ale kroczący
+jest teraz zalecanym domyślnym wyborem dla realnej, ciągłej detekcji.
 
-Test: `test_meta_adapter.py` (7 testów: kontrole syntetyczne
-pozytywna/negatywna, dowód algebraiczny błędu V1, walidacja wejścia, oba
-warianty end-to-end na realnym śladzie).
+**Skąd ten wniosek — zbadana (nie porzucona) kwestia obiegowości
+kalibracji**: pytanie brzmiało, czy liczenie progu z całego śladu (włącznie
+z samym zdarzeniem) nie jest ukrytym "przejściem między dwoma reżimami" w
+jednej statystyce — dokładnie ten sam problem, jaki ten projekt już raz
+znalazł gdzie indziej (patrz niżej, "kalibracja nie może być na oknie, które
+już zawiera rój"). Odpowiedź: tak, pre-event i post-event to naprawdę
+drastycznie różne reżimy (zweryfikowane na surowych danych — odch. std.
+amplitudy skacze z ~9 400 do ~2-5 mln i zostaje ~40× podwyższone nawet 3-5
+min później — to realna fizyka silnego wstrząsu + sekwencji wstrząsów
+wtórnych, nie artefakt przetwarzania). Konsekwencja: wariant **całościowy**
+(`calibration_end=None`) daje krzywą narastanie-i-zanik (dobra do analizy
+POST-HOC pełnego zapisu), a wariant **wyłącznie przyczynowy**
+(`calibration_end=55.0`, próg zamrożony raz przed zdarzeniem) daje wynik
+niemal binarny (56/67 kroków "krytyczna" — nigdy "nie zapomina" mainshocku,
+bo referencja nigdy się nie aktualizuje). Ta sztywność przyczynowego wariantu
+była właśnie motywacją do dodania trzeciego, **kroczącego** wariantu opisanego
+wyżej — on jeden łączy przyczynowość z adaptacją. Wszystkie trzy warianty
+zostają w kodzie (`build_meta_series_from_waveform`), żaden nie zastępuje
+pozostałych — odpowiadają na różne pytania ("jak ewoluuje aktywność w
+obrębie zdarzenia" vs. "czy jestem już w reżimie po-katastroficznym" vs.
+"czy jestem w reżimie po-katastroficznym TERAZ, z pamięcią, która się
+odświeża").
+
+Test: `test_meta_adapter.py` (9 testów: kontrole syntetyczne
+pozytywna/negatywna, dowód algebraiczny błędu V1, walidacja wejścia,
+wszystkie trzy warianty end-to-end na realnym śladzie, wzajemna
+wykluczalność `calibration_end`/`rolling_history_seconds`).
 
 ## Ograniczenia (zwięźle — pełne dowody w `HISTORIA_I_TESTY.md`)
 
