@@ -92,26 +92,13 @@ class PrecursorValidationWarning(UserWarning):
     validation as an earthquake precursor. See HISTORIA_I_TESTY.md."""
 
 
-def _ensure_timdr_math_formalism_on_path() -> None:
-    """Adds the sibling TIMDR-Math-Formalism folder to sys.path - same
-    pattern as `meta_adapter.py`'s `_ensure_timdr_meta_dynamics_on_path()`
-    and `bearing_meta_adapter.py`'s `_ensure_siblings_on_path()` in
-    TIMDR-Industrial-Predict. TIMDR-Earthquake-Core sits directly in the
-    parent directory, so the sibling is exactly one level up."""
-    here = os.path.dirname(os.path.abspath(__file__))
-    sibling = os.path.abspath(os.path.join(here, "..", "TIMDR-Math-Formalism"))
-    if not os.path.isdir(sibling):
-        raise ImportError(
-            "precursor_validation wymaga folderu 'TIMDR-Math-Formalism' jako "
-            f"siostry repo TIMDR-Earthquake-Core (szukano w: {sibling})."
-        )
-    if sibling not in sys.path:
-        sys.path.insert(0, sibling)
-
-
-_ensure_timdr_math_formalism_on_path()
-
-from timdr_formalism.pipeline import mann_whitney_test as _mann_whitney_test  # noqa: E402
+# VENDORED 2026-09-10 (see the header of _vendor_timdr_formalism_pipeline.py
+# in this repo for full rationale): this module used to load
+# TIMDR-Math-Formalism via a sys.path sibling-import from a sibling folder
+# on disk. Replaced with a local vendored copy so this repo works standalone
+# after cloning ONLY itself (decision made on explicit request: "code
+# repositories should be independent of each other"). Behavior/math unchanged.
+from _vendor_timdr_formalism_pipeline import mann_whitney_test as _mann_whitney_test
 
 
 def mannwhitney_validate(
