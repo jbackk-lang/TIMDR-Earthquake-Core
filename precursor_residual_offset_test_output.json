@@ -15,5 +15,622 @@
       "mean_frac_persistent_with_signal": 0.06666666666666667,
       "mean_frac_persistent_background": 0.0
     }
+  },
+  "real_test": {
+    "n_pre_event_windows": 40,
+    "n_background_windows": 60,
+    "mean_frac_persistent_pre_event": 0.010174535945862933,
+    "mean_frac_persistent_background": 0.00010822510822510824,
+    "mannwhitney_p_value": 0.02513905367384865,
+    "significant_at_0_05": true,
+    "pre_event_higher_than_background": true,
+    "background_time_budget_hit": false,
+    "pre_event_details": [
+      {
+        "event_id": "us6000nj9s",
+        "station": "MAJO",
+        "frac_persistent": 0.0,
+        "n_candidates": 5
+      },
+      {
+        "event_id": "us6000rfwz",
+        "station": "MAJO",
+        "frac_persistent": 0.0,
+        "n_candidates": 6
+      },
+      {
+        "event_id": "us6000m05c",
+        "station": "MAJO",
+        "frac_persistent": 0.0,
+        "n_candidates": 12
+      },
+      {
+        "event_id": "us7000i90q",
+        "station": "MAJO",
+        "frac_persistent": 0.0,
+        "n_candidates": 12
+      },
+      {
+        "event_id": "us7000stti",
+        "station": "BFO",
+        "frac_persistent": 0.0,
+        "n_candidates": 12
+      },
+      {
+        "event_id": "us6000sxwq",
+        "station": "MAJO",
+        "frac_persistent": 0.0,
+        "n_candidates": 18
+      },
+      {
+        "event_id": "us6000k49j",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 12
+      },
+      {
+        "event_id": "us6000si5l",
+        "station": "HRV",
+        "frac_persistent": 0.0,
+        "n_candidates": 39
+      },
+      {
+        "event_id": "us7000m9g4",
+        "station": "MAJO",
+        "frac_persistent": 0.0,
+        "n_candidates": 30
+      },
+      {
+        "event_id": "us6000jllz",
+        "station": "BFO",
+        "frac_persistent": 0.0,
+        "n_candidates": 20
+      },
+      {
+        "event_id": "us7000srcg",
+        "station": "CTAO",
+        "frac_persistent": 0.0462046204620462,
+        "n_candidates": 1515
+      },
+      {
+        "event_id": "us6000kdcu",
+        "station": "CTAO",
+        "frac_persistent": 0.15413070283600494,
+        "n_candidates": 811
+      },
+      {
+        "event_id": "us7000qd1y",
+        "station": "COLA",
+        "frac_persistent": 0.0,
+        "n_candidates": 15
+      },
+      {
+        "event_id": "us6000t7zp",
+        "station": "HRV",
+        "frac_persistent": 0.0,
+        "n_candidates": 20
+      },
+      {
+        "event_id": "us7000s7u4",
+        "station": "MAJO",
+        "frac_persistent": 0.0,
+        "n_candidates": 16
+      },
+      {
+        "event_id": "us7000l9h4",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 6
+      },
+      {
+        "event_id": "us6000lqf9",
+        "station": "MAJO",
+        "frac_persistent": 0.0,
+        "n_candidates": 19
+      },
+      {
+        "event_id": "us6000sz1d",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 10
+      },
+      {
+        "event_id": "us6000q5tp",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 16
+      },
+      {
+        "event_id": "us7000s789",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 12
+      },
+      {
+        "event_id": "us7000jl3s",
+        "station": "ANMO",
+        "frac_persistent": 0.0,
+        "n_candidates": 7
+      },
+      {
+        "event_id": "us6000lq00",
+        "station": "CTAO",
+        "frac_persistent": 0.0056657223796034,
+        "n_candidates": 353
+      },
+      {
+        "event_id": "us7000srb1",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 24
+      },
+      {
+        "event_id": "usd000j5jt",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 13
+      },
+      {
+        "event_id": "us6000rtie",
+        "station": "MAJO",
+        "frac_persistent": 0.0,
+        "n_candidates": 19
+      },
+      {
+        "event_id": "us7000q0bm",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 13
+      },
+      {
+        "event_id": "us7000ingh",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 17
+      },
+      {
+        "event_id": "us7000ingi",
+        "station": "CTAO",
+        "frac_persistent": 0.11764705882352941,
+        "n_candidates": 255
+      },
+      {
+        "event_id": "us7000g9zq",
+        "station": "MAJO",
+        "frac_persistent": 0.0,
+        "n_candidates": 7
+      },
+      {
+        "event_id": "us7000gyj0",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 6
+      },
+      {
+        "event_id": "us6000jlqa",
+        "station": "BFO",
+        "frac_persistent": 0.08333333333333333,
+        "n_candidates": 36
+      },
+      {
+        "event_id": "us7000hcqw",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 11
+      },
+      {
+        "event_id": "us6000ft9g",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 18
+      },
+      {
+        "event_id": "us7000fszl",
+        "station": "MAJO",
+        "frac_persistent": 0.0,
+        "n_candidates": 13
+      },
+      {
+        "event_id": "us7000q9b5",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 25
+      },
+      {
+        "event_id": "us7000sui3",
+        "station": "MAJO",
+        "frac_persistent": 0.0,
+        "n_candidates": 27
+      },
+      {
+        "event_id": "us7000jkbd",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 6
+      },
+      {
+        "event_id": "us6000rmea",
+        "station": "MAJO",
+        "frac_persistent": 0.0,
+        "n_candidates": 11
+      },
+      {
+        "event_id": "us7000nzf3",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 22
+      },
+      {
+        "event_id": "us7000glex",
+        "station": "CTAO",
+        "frac_persistent": 0.0,
+        "n_candidates": 5
+      }
+    ],
+    "background_details": [
+      {
+        "station": "COLA",
+        "time": "2021-10-29T10:43:54.357209+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 7
+      },
+      {
+        "station": "HRV",
+        "time": "2022-12-04T17:31:25.981431+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 14
+      },
+      {
+        "station": "KONO",
+        "time": "2025-05-19T20:41:59.523080+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 10
+      },
+      {
+        "station": "COLA",
+        "time": "2024-08-26T10:49:57.836664+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 10
+      },
+      {
+        "station": "PFO",
+        "time": "2022-11-12T09:48:28.143551+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 51
+      },
+      {
+        "station": "ANMO",
+        "time": "2024-07-04T01:47:39.997859+00:00",
+        "frac_persistent": 0.006493506493506494,
+        "n_candidates": 154
+      },
+      {
+        "station": "HRV",
+        "time": "2025-09-30T00:18:52.882659+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 13
+      },
+      {
+        "station": "ANMO",
+        "time": "2025-06-29T15:01:24.122721+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 19
+      },
+      {
+        "station": "KONO",
+        "time": "2025-03-10T21:45:58.275443+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 25
+      },
+      {
+        "station": "CTAO",
+        "time": "2023-02-02T22:01:31.628483+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 16
+      },
+      {
+        "station": "CTAO",
+        "time": "2022-03-19T08:04:14.875349+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 15
+      },
+      {
+        "station": "CTAO",
+        "time": "2024-09-19T14:27:39.099630+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 16
+      },
+      {
+        "station": "ANMO",
+        "time": "2025-05-07T13:30:46.599580+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 13
+      },
+      {
+        "station": "COLA",
+        "time": "2026-07-25T17:43:52.137966+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 0
+      },
+      {
+        "station": "HRV",
+        "time": "2025-11-05T11:11:05.933111+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 13
+      },
+      {
+        "station": "CTAO",
+        "time": "2024-08-02T11:17:04.737785+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 12
+      },
+      {
+        "station": "COLA",
+        "time": "2021-12-06T10:22:07.288524+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 6
+      },
+      {
+        "station": "PFO",
+        "time": "2025-07-25T15:39:14.449260+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 19
+      },
+      {
+        "station": "BFO",
+        "time": "2024-11-16T22:14:21.645310+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 22
+      },
+      {
+        "station": "CTAO",
+        "time": "2022-07-07T15:30:36.513270+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 9
+      },
+      {
+        "station": "CTAO",
+        "time": "2022-10-01T03:40:07.085747+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 19
+      },
+      {
+        "station": "HRV",
+        "time": "2025-03-17T14:59:25.499843+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 29
+      },
+      {
+        "station": "COLA",
+        "time": "2024-09-29T11:11:55.447270+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 16
+      },
+      {
+        "station": "KONO",
+        "time": "2024-05-15T14:35:14.283743+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 14
+      },
+      {
+        "station": "PFO",
+        "time": "2022-07-09T00:17:23.690080+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 171
+      },
+      {
+        "station": "PFO",
+        "time": "2025-02-14T05:21:53.569782+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 20
+      },
+      {
+        "station": "ANMO",
+        "time": "2025-09-22T00:16:00.339304+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 7
+      },
+      {
+        "station": "PFO",
+        "time": "2026-04-07T06:37:22.535276+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 14
+      },
+      {
+        "station": "CTAO",
+        "time": "2022-10-06T20:18:11.940156+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 15
+      },
+      {
+        "station": "BFO",
+        "time": "2023-09-05T19:56:16.632945+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 17
+      },
+      {
+        "station": "BFO",
+        "time": "2022-06-01T13:02:10.854603+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 26
+      },
+      {
+        "station": "KONO",
+        "time": "2022-12-07T21:32:43.886886+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 16
+      },
+      {
+        "station": "HRV",
+        "time": "2025-06-08T02:27:56.295027+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 64
+      },
+      {
+        "station": "KONO",
+        "time": "2024-03-31T16:30:44.460604+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 31
+      },
+      {
+        "station": "COLA",
+        "time": "2025-06-24T02:31:09.073619+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 177
+      },
+      {
+        "station": "COLA",
+        "time": "2022-06-19T17:42:37.708533+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 16
+      },
+      {
+        "station": "KONO",
+        "time": "2025-08-29T08:20:12.646451+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 45
+      },
+      {
+        "station": "BFO",
+        "time": "2024-05-06T10:28:08.408931+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 22
+      },
+      {
+        "station": "ANMO",
+        "time": "2025-02-06T07:40:26.602947+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 9
+      },
+      {
+        "station": "COLA",
+        "time": "2025-02-08T22:10:29.461809+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 7
+      },
+      {
+        "station": "HRV",
+        "time": "2025-07-17T11:53:06.639125+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 9
+      },
+      {
+        "station": "CTAO",
+        "time": "2022-04-05T09:14:45.206297+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 10
+      },
+      {
+        "station": "ANMO",
+        "time": "2026-06-20T12:23:53.925223+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 16
+      },
+      {
+        "station": "HRV",
+        "time": "2026-07-23T11:57:33.903539+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 20
+      },
+      {
+        "station": "KONO",
+        "time": "2024-03-28T07:43:04.925309+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 23
+      },
+      {
+        "station": "COLA",
+        "time": "2026-01-19T11:58:26.565560+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 9
+      },
+      {
+        "station": "HRV",
+        "time": "2025-11-27T20:22:41.293534+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 12
+      },
+      {
+        "station": "KONO",
+        "time": "2024-05-25T04:03:43.942962+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 10
+      },
+      {
+        "station": "ANMO",
+        "time": "2024-09-10T21:02:00.551388+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 11
+      },
+      {
+        "station": "BFO",
+        "time": "2021-10-19T08:20:31.213097+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 6
+      },
+      {
+        "station": "CTAO",
+        "time": "2026-02-03T11:16:44.168859+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 12
+      },
+      {
+        "station": "HRV",
+        "time": "2022-11-24T19:16:18.767804+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 10
+      },
+      {
+        "station": "PFO",
+        "time": "2026-02-02T04:04:52.076192+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 9
+      },
+      {
+        "station": "COLA",
+        "time": "2022-02-17T02:52:54.795762+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 15
+      },
+      {
+        "station": "BFO",
+        "time": "2025-10-12T01:04:45.072979+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 20
+      },
+      {
+        "station": "KONO",
+        "time": "2022-05-06T02:48:24.596022+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 16
+      },
+      {
+        "station": "BFO",
+        "time": "2026-06-07T19:13:58.289582+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 9
+      },
+      {
+        "station": "KONO",
+        "time": "2023-01-10T12:44:27.724968+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 21
+      },
+      {
+        "station": "PFO",
+        "time": "2025-04-06T22:25:32.507818+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 23
+      },
+      {
+        "station": "CTAO",
+        "time": "2023-11-22T08:02:39.705338+00:00",
+        "frac_persistent": 0.0,
+        "n_candidates": 185
+      }
+    ],
+    "rank_biserial_effect_size": 0.10958333333333337,
+    "effect_size_label": "maly",
+    "mannwhitney_p_value_recomputed_check": 0.02513905367384865
   }
 }

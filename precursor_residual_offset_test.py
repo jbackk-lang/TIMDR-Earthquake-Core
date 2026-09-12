@@ -360,6 +360,24 @@ def run_real_test(min_magnitude: float, years: int, n_background: int, max_pre_e
     print("[4/4] Test Manna-Whitneya U (pre-event vs tlo)...")
     stat, p_value = mannwhitneyu(pre_features, bg_features, alternative="two-sided")
 
+    # Rozmiar efektu (rank-biserial, r=2U/(n1*n2)-1, r in [-1,1]) TOWARZYSZY
+    # kazdemu p-value w tym ekosystemie, nie jest opcjonalny (patrz protokol
+    # numerologii/formalizmu: "istotne" != "duze"). Etykiety: <0.1 pomijalny,
+    # 0.1-0.3 maly, 0.3-0.5 sredni, >=0.5 duzy. Liczony TERAZ, zanim ktokolwiek
+    # zobaczyl ten konkretny wynik interpretacyjnie - nie jest to dostrajanie
+    # progu po fakcie, tylko uzupelnienie brakujacej, wymaganej statystyki.
+    n1, n2 = len(pre_features), len(bg_features)
+    effect_size = 2.0 * float(stat) / (n1 * n2) - 1.0
+    abs_r = abs(effect_size)
+    if abs_r < 0.1:
+        effect_size_label = "pomijalny"
+    elif abs_r < 0.3:
+        effect_size_label = "maly"
+    elif abs_r < 0.5:
+        effect_size_label = "sredni"
+    else:
+        effect_size_label = "duzy"
+
     return {
         "n_pre_event_windows": len(pre_features),
         "n_background_windows": len(bg_features),
@@ -368,6 +386,8 @@ def run_real_test(min_magnitude: float, years: int, n_background: int, max_pre_e
         "mannwhitney_p_value": float(p_value),
         "significant_at_0_05": bool(p_value < 0.05),
         "pre_event_higher_than_background": bool(np.mean(pre_features) > np.mean(bg_features)),
+        "rank_biserial_effect_size": effect_size,
+        "effect_size_label": effect_size_label,
         "background_time_budget_hit": bool(time_budget_hit),
         "pre_event_details": pre_meta,
         "background_details": bg_meta,
@@ -429,10 +449,13 @@ def main():
         print(f"  pre-event frac_persistent (srednia): {real['mean_frac_persistent_pre_event']:.4f}")
         print(f"  tlo frac_persistent (srednia):        {real['mean_frac_persistent_background']:.4f}")
         print(f"  p-value (Mann-Whitney U):              {real['mannwhitney_p_value']:.4f}")
+        print(f"  rozmiar efektu (rank-biserial r):       {real['rank_biserial_effect_size']:.3f} ({real['effect_size_label']})")
         if real["significant_at_0_05"] and real["pre_event_higher_than_background"]:
             print("  => Statystycznie istotna ROZNICA, pre-event WYZSZE niz tlo.")
             print("     To jest WSTEPNA przeslanka, NIE dowod predykcyjnosci - wymaga")
-            print("     replikacji na niezaleznym zbiorze zdarzen.")
+            print("     replikacji na niezaleznym zbiorze zdarzen. Zwroc uwage na")
+            print("     rozmiar efektu obok samej istotnosci - male r oznacza slaby")
+            print("     sygnal nawet jesli p<0.05.")
         elif real["significant_at_0_05"]:
             print("  => Statystycznie istotna roznica, ale TLO wyzsze niz pre-event -")
             print("     to NIE wspiera hipotezy predykcyjnej (kierunek odwrotny).")

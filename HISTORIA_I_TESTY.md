@@ -243,14 +243,53 @@ USGS/EarthScope będzie uczciwe, jabłka do jabłek, gdy ktoś z prawdziwym
 dostępem do sieci uruchomi: `pip install obspy requests scipy && python
 precursor_residual_offset_test.py --mode real`.
 
-**Ten wynik NIE jest jeszcze znany.** Zostanie tu dopisany dokładnie taki,
-jaki wyjdzie — łącznie z wynikiem negatywnym, gdyby taki był (dokładnie ta
-sama dyscyplina co przy ringdown: brak z góry założonej "lepszej"
-odpowiedzi tylko dlatego, że cecha jest koncepcyjnie odrębna i nowa).
-Dopóki `real_test` nie zostanie uruchomiony, `residual_offset()` NIE jest
-podłączony do `precursor_validation.py`/`mannwhitney_validate()` jako
-zwalidowany sygnał — nie ma jeszcze zamrożonego pliku wyniku realnego, z
-którego `validate_against_catalog()` mogłoby czytać.
+**WYNIK (uruchomienie przez użytkownika, katalog USGS M≥6.5 z ostatnich 5
+lat, próbka 40 z 205 zdarzeń seed=7, 8 stacji GSN, 60 okien tła):**
+
+| | średnia `frac_persistent` |
+|---|---|
+| pre-event (40 okien) | 0.0102 |
+| tło (60 okien) | 0.0001 |
+
+Test Manna-Whitneya U: **p = 0.0251** — statystycznie istotna różnica,
+pre-event WYŻSZE niż tło. **Rozmiar efektu (rank-biserial r) ≈ 0.11 —
+mały** (etykiety tego repo: <0.1 pomijalny, 0.1–0.3 mały, 0.3–0.5 średni,
+≥0.5 duży). To jest odwrotny kierunek niż `ringdown_resonance()` (tam:
+p=0.997, wynik negatywny) — pierwszy niepusty wynik pozytywny w tym
+repo na realnym katalogu USGS/EarthScope.
+
+**Uczciwe zastrzeżenia, zanim to zostanie uznane za cokolwiek więcej niż
+wstępny trop:**
+
+- **Sygnał jest skrajnie rzadki w obu grupach**: tylko 5 z 40 okien
+  pre-event miało `frac_persistent > 0` (0.046, 0.154, 0.006, 0.118,
+  0.083), i tylko 1 z 60 okien tła (0.006). Cała statystyczna różnica
+  jest napędzana garstką zdarzeń, nie ogólnym przesunięciem rozkładu —
+  jeden dodatkowy/brakujący niezerowy wynik w dowolnej grupie mógłby
+  zmienić istotność. To dokładnie ten rodzaj kruchości, o którym mówi
+  punkt 8 protokołu numerologii (sprawdzaj moc/solidność wyniku, nie tylko
+  p-value) — tu zastosowany w drugą stronę: solidność wyniku POZYTYWNEGO,
+  nie tylko negatywnego.
+- **Brak korekty Bonferroniego** za wielokrotne testowanie: to DRUGA cecha
+  precursor testowana na tym samym katalogu w tym repo (`frac_oscillatory`
+  było pierwsze) — przy dwóch testach nieskorygowany próg 0.05 i
+  skorygowany (Bonferroni, α=0.025) dają w tym konkretnym przypadku tę samą
+  konkluzję (p=0.0251 jest tuż PONAD progiem 0.025) — czyli wynik jest na
+  granicy nawet bez dalszych porównań.
+- **Replikacja na niezależnym zbiorze zdarzeń jest wymagana** przed
+  uznaniem tego za cokolwiek więcej niż wstępną przesłankę — dokładnie tak
+  samo jak przy każdym innym pojedynczym pozornie pozytywnym wyniku w tym
+  ekosystemie (patrz np. trop BTC w `deliverable_timdr_finanse`, który nie
+  przetrwał replikacji na złocie).
+- `residual_offset()` NIE jest (jeszcze) podłączony do
+  `precursor_validation.py`/`mannwhitney_validate()` jako zwalidowany
+  sygnał — świadoma decyzja, żeby nie utrwalać w kodzie wyniku granicznego
+  i niezreplikowanego jako "zwalidowany". Ewentualne podłączenie powinno
+  poczekać na replikację.
+
+Pełny wynik z metadanymi każdego okna (w tym rozmiar efektu, doliczony do
+już zapisanego pliku bez ponownego pobierania danych):
+`precursor_residual_offset_test_output.json`.
 
 Testy jednostkowe samej funkcji (nie diagnostyki end-to-end powyżej):
 `test_residual_offset.py` — pozytywna/negatywna kontrola, dyskryminacja
