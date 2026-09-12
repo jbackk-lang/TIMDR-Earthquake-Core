@@ -166,8 +166,6 @@ UCZCIWE ZASTRZEZENIA:
 """
 from __future__ import annotations
 
-import os
-import sys
 from dataclasses import dataclass
 from typing import List, Optional
 
@@ -179,31 +177,14 @@ MAD_TO_STD = 1.4826  # ta sama stala co Synoptyk-v3/membrane/defects.py
 ROBUST_K = 3.5        # ta sama wartosc co Synoptyk-v3 DEFECT_K, patrz zastrzezenie #3
 ANOMALY_FACTOR = 3.5  # jw., przekazywane do core.anomalies()
 
-
-def _ensure_timdr_meta_dynamics_on_path() -> None:
-    """Dodaje folder-siostre TIMDR-META-DYNAMICS do sys.path - ten sam
-    wzorzec co Synoptyk-v3/membrane/meta_adapter.py i
-    analizator-gieldowy-v3/meta_dynamics_module.py. TIMDR-Earthquake-Core
-    lezy BEZPOSREDNIO w katalogu nadrzednym (nie w podfolderze jak
-    membrane/ w Synoptyk-v3), wiec siostra jest o JEDEN poziom wyzej."""
-    here = os.path.dirname(os.path.abspath(__file__))
-    sibling = os.path.join(here, "..", "TIMDR-META-DYNAMICS")
-    sibling = os.path.abspath(sibling)
-
-    if not os.path.isdir(sibling):
-        raise ImportError(
-            "meta_adapter wymaga folderu 'TIMDR-META-DYNAMICS' jako "
-            f"siostry repo TIMDR-Earthquake-Core (szukano w: {sibling})."
-        )
-    if sibling not in sys.path:
-        sys.path.insert(0, sibling)
-
-
-_ensure_timdr_meta_dynamics_on_path()
-
-from timdr_meta_dynamics import MetaState, MetaOperatorM  # noqa: E402
-from analysis.meta_map import MetaMap  # noqa: E402
-from analysis.meta_trigger import MetaTrigger, MetaTriggerResult  # noqa: E402
+# ZWENDOROWANE 2026-09-10 (patrz naglowek _vendor_timdr_meta_dynamics_core.py
+# w tym repo dla pelnego uzasadnienia): wczesniej ten modul ladowal
+# TIMDR-META-DYNAMICS przez sys.path sibling-import z folderu-siostry na
+# dysku. Zamienione na lokalna, zwendorowana kopie, zeby to repo dzialalo
+# samodzielnie po sklonowaniu WYLACZNIE siebie (decyzja na wyrazna
+# prosbe: "repozytoria kodu maja byc niezalezne od siebie"). Zachowanie/
+# matematyka bez zmian.
+from _vendor_timdr_meta_dynamics_core import MetaState, MetaOperatorM, MetaMap, MetaTrigger, MetaTriggerResult
 
 
 WINDOW_SECONDS = 5.0

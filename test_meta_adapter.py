@@ -78,7 +78,7 @@ def test_negative_control_two_identical_calm_windows_give_zero_M_and_stable_phas
     t1, s1 = t[:half], s[:half]
     t2, s2 = t[:half], s[:half]  # ta sama tablica - identyczne okno
 
-    from timdr_meta_dynamics import MetaOperatorM
+    from _vendor_timdr_meta_dynamics_core import MetaOperatorM
     op = MetaOperatorM()
     state1 = window_to_meta_state(core, t1, s1, thresholds)
     state2 = window_to_meta_state(core, t2, s2, thresholds)
