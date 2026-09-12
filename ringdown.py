@@ -29,6 +29,16 @@ README.md, sekcja o teście predykcyjności `Topology(t)`, dla precedensu
 tego samego rodzaju testu na innej matematyce w tym repo - wynik tamtego
 testu był NEGATYWNY.
 
+**Cecha koncepcyjnie odwrotna, nie duplikat**: `frac_oscillatory` (i cały
+ten moduł) pyta, czy powrót do poziomu odniesienia jest oscylacyjny - z
+definicji szuka sygnału, który W KOŃCU wraca w okolice zera. Pytanie
+"czy odchylenie ZOSTAJE (nie wraca do zera)" jest osobną, przeciwną osią
+tego samego zjawiska - operacjonalizuje ją `residual_offset.py` w tym
+samym repo, z własnym, niezależnym testem predykcyjności
+(`precursor_residual_offset_test.py`). Wynik negatywny powyżej (p=0.997)
+jest odrzuceniem KONKRETNIE `frac_oscillatory` jako prekursora, nie
+odrzuceniem hipotezy "trwały ślad" w ogóle - patrz HISTORIA_I_TESTY.md.
+
 NIEZWALIDOWANE NA DANYCH SEJSMICZNYCH w chwili portowania tej funkcji -
 zweryfikowane wyłącznie na syntetycznym, czystym tłumionym oscylatorze
 (jak we wszystkich innych portach). Realne sejsmogramy po wstrząsie to

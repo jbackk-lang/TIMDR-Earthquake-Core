@@ -184,6 +184,83 @@ dowód — dokładnie tak jak „trop” z BTC w `deliverable_timdr_finanse` nie
 przetrwał replikacji na
 złocie.
 
+## `residual_offset.py` — czy odchylenie po zdarzeniu ZOSTAJE (nie wraca do zera) — i test predykcyjności (`precursor_residual_offset_test.py`)
+
+Powyższy wynik negatywny (p=0.997) dotyczy KONKRETNIE cechy
+`frac_oscillatory` z `ringdown_resonance()` — która pyta "czy powrót do
+linii bazowej jest oscylacyjny", czyli z definicji szuka sygnału, który
+W KOŃCU wraca w okolice zera. To nie jest to samo pytanie co "czy
+zdarzenie zostawiło trwały ślad" — te dwa pytania patrzą w przeciwne
+strony tej samej osi (zanika z powrotem do zera vs NIE wraca do zera).
+`residual_offset()` operacjonalizuje wprost drugie pytanie: średnie
+bezwzględne odchylenie od linii bazowej w OSTATNIM fragmencie (ostatnie
+20%) okna obserwacji po zdarzeniu, względem tego samego progu szumu
+sprzed zdarzenia co `ringdown_resonance()` liczy (dla uczciwego
+porównania na tych samych danych).
+
+Parametry zamrożone PRZED jakimkolwiek testem na realnych danych:
+`tail_fraction=0.2`, `persistence_threshold=1.0` (próg dokładnie na
+granicy szumu), `min_tail_samples=5` (poniżej tego: `is_persistent=False,
+insufficient_tail_samples=True`, fail-closed zamiast cichego zgadywania).
+Przypadek zdegenerowany `noise_floor=0` (brak zmienności przed
+zdarzeniem) obsłużony jawnie, bez dzielenia przez zero.
+
+### Self-test syntetyczny (`precursor_residual_offset_test.py --mode synthetic`, domyślny, bez sieci)
+
+Trzy niezależne kontrole, wszystkie muszą przejść zanim skrypt pozwoli na
+`--mode real`:
+
+1. **Kontrola pozytywna** — wstrzyknięty trwały skok: wykryty,
+   `p ≈ 1.29×10⁻¹¹`.
+2. **Kontrola negatywna** — tło bez wstrzykniętego sygnału: brak
+   fałszywego alarmu, `p ≈ 0.245`.
+3. **Kontrola dyskryminacyjna** (kluczowa, nowa — nie ma odpowiednika w
+   teście ringdown) — DOKŁADNIE ten sam zanikający sygnał oscylacyjny,
+   który `ringdown_resonance()` klasyfikuje jako `is_oscillatory=True`
+   (własna kontrola pozytywna ringdown), podany do `residual_offset()`:
+   średnia `is_persistent` na tym sygnale = **0.04** (próg zdania testu:
+   `<0.3`). Dowodzi, że `residual_offset()` nie jest przeetykietowaniem
+   `frac_oscillatory` — na tym samym sygnale, który "dzwoni i wraca do
+   zera", NIE zgłasza trwałego odcisku, bo faktycznie takiego nie ma.
+
+Bezpośrednia sonda trwałości (`_direct_persistence_probe`): przy
+wstrzykniętym trwałym skoku średni `frac_persistent ≈ 0.607` vs tło
+`≈ 0.038`. **`pipeline_verified: True`** — wszystkie trzy bramki
+przeszły. Pełne liczby: `precursor_residual_offset_test_output.json`
+(klucz `synthetic_selftest`).
+
+### Test na realnych danych (`--mode real`)
+
+**Nieuruchomiony w tym repo w tej sesji** — dokładnie ten sam powód co
+przy `precursor_ringdown_test.py --mode real` wcześniej: sandbox, w
+którym powstał ten kod, nie ma dostępu sieciowego do
+`earthquake.usgs.gov`/`service.earthscope.org`/`service.ncedc.org`
+(potwierdzone niedostępne nawet przez curl/ObsPy/przeglądarkę). Skrypt
+reużywa DOKŁADNIE tego samego mechanizmu pobierania katalogu/okien co
+`precursor_ringdown_test.py` (import współdzielonych stałych/funkcji, nie
+kopia) — więc porównanie z wynikiem ringdown na tym samym katalogu
+USGS/EarthScope będzie uczciwe, jabłka do jabłek, gdy ktoś z prawdziwym
+dostępem do sieci uruchomi: `pip install obspy requests scipy && python
+precursor_residual_offset_test.py --mode real`.
+
+**Ten wynik NIE jest jeszcze znany.** Zostanie tu dopisany dokładnie taki,
+jaki wyjdzie — łącznie z wynikiem negatywnym, gdyby taki był (dokładnie ta
+sama dyscyplina co przy ringdown: brak z góry założonej "lepszej"
+odpowiedzi tylko dlatego, że cecha jest koncepcyjnie odrębna i nowa).
+Dopóki `real_test` nie zostanie uruchomiony, `residual_offset()` NIE jest
+podłączony do `precursor_validation.py`/`mannwhitney_validate()` jako
+zwalidowany sygnał — nie ma jeszcze zamrożonego pliku wyniku realnego, z
+którego `validate_against_catalog()` mogłoby czytać.
+
+Testy jednostkowe samej funkcji (nie diagnostyki end-to-end powyżej):
+`test_residual_offset.py` — pozytywna/negatywna kontrola, dyskryminacja
+od `ringdown_resonance()` (ten sam zanikający sygnał, potwierdzone
+przeciwne odpowiedzi obu funkcji), skalowanie `offset_ratio` z
+wielkością skoku, przypadek zdegenerowany `noise_floor=0`,
+`insufficient_tail_samples`, i test regresyjny na prawdziwym śladzie
+`obspy_BW_RJOB_example.csv` (event_idx wyznaczony tym samym STA/LTA co
+w `test_ringdown.py`, żeby oba testy patrzyły na to samo zdarzenie).
+
 ## Przykład użycia
 
 ```python
@@ -486,3 +563,11 @@ próbek, potem powrót do czystego szumu):
   brzegowy ograniczony do pojedynczej próbki (nie "sklejanie się"
   fałszywych alarmów) — `classify_anomalies()` i tak grupuje go w ten sam
   blok zdarzenia co samą anomalię.
+
+## Stan testów po dodaniu `residual_offset.py` (`test_residual_offset.py`)
+
+`pytest -q` — **100 testów przechodzi** (poprzednie 92 + 8 nowych w
+`test_residual_offset.py`, patrz sekcja `residual_offset.py` wyżej).
+Zero zmian w istniejących testach — nowa cecha żyje w osobnym pliku,
+importuje `ringdown_resonance()` tylko do jednego testu dyskryminacyjnego
+(porównanie na tym samym sygnale, nie modyfikacja).
