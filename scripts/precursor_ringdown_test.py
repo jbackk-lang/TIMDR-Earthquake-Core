@@ -70,11 +70,13 @@ import json
 import sys
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # repo root, dla "core.X"
 
 import numpy as np
 
-from ringdown import ringdown_resonance
-from timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.ringdown import ringdown_resonance
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
 
 # ---------------------------------------------------------------------
 # PARAMETRY ZAMROŻONE PRZED URUCHOMIENIEM NA REALNYCH DANYCH

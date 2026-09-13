@@ -57,7 +57,7 @@ from datetime import datetime
 import numpy as np
 import pytest
 
-from omori_forecast import (
+from core.omori_forecast import (
     fit_omori_utsu,
     fit_gutenberg_richter_b,
     forecast_probability,
@@ -73,7 +73,7 @@ from omori_forecast import (
 )
 
 MAINSHOCK_T0 = datetime.fromisoformat("2019-07-06T03:19:53.040000+00:00")
-DATA_DIR = os.path.join(os.path.dirname(__file__), "data", "ridgecrest_2019")
+DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "ridgecrest_2019")
 
 
 def _load_catalog(filename):

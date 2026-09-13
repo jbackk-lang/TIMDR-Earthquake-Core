@@ -32,7 +32,7 @@ WYNIK (10 ziaren, mikro-wstrzas: skok +50 do amplitudy szumu N(0,1) na
 """
 import numpy as np
 import pytest
-from timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
 
 
 @pytest.fixture

@@ -79,8 +79,10 @@ from functools import lru_cache
 import numpy as np
 
 _DEFAULT_DATASET_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "precursor_ringdown_test_output.json"
-)
+    os.path.dirname(os.path.abspath(__file__)), "..", "docs", "precursor_ringdown_test_output.json"
+)  # POPRAWIONE przy reorganizacji repo: ten plik jest teraz w core/, a wynik
+   # JSON w docs/ (byl w tym samym katalogu co ten moduł, kiedy oba były przy
+   # korzeniu repo).
 
 ALPHA_DEFAULT = 0.05
 MIN_EFFECT_SIZE_R_DEFAULT = 0.2  # Cohen's convention: |r| >= 0.2 ~ "small" effect
@@ -98,7 +100,7 @@ class PrecursorValidationWarning(UserWarning):
 # on disk. Replaced with a local vendored copy so this repo works standalone
 # after cloning ONLY itself (decision made on explicit request: "code
 # repositories should be independent of each other"). Behavior/math unchanged.
-from _vendor_timdr_formalism_pipeline import mann_whitney_test as _mann_whitney_test
+from core._vendor_timdr_formalism_pipeline import mann_whitney_test as _mann_whitney_test
 
 
 def mannwhitney_validate(

@@ -17,9 +17,12 @@ trzęsienie M7.4 w Kolumbii z 2026-08-08).
     feats = r.json()["features"]
     RAW = [(f["properties"]["mag"], f["properties"]["time"]) for f in feats]
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # repo root, dla "core.X"
 
 import numpy as np
-from catalog_core import TIMDRCatalogFusion
+from core.catalog_core import TIMDRCatalogFusion
 
 RAW = [
     (5.3, 1786646371327), (5.1, 1786642769650), (5.6, 1786637505826), (5.0, 1786625099102),

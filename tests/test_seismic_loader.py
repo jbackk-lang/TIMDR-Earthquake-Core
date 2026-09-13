@@ -3,7 +3,7 @@ import pytest
 import csv as csvmod
 import json
 import warnings
-from seismic_loader import SeismicLoader
+from core.seismic_loader import SeismicLoader
 
 
 @pytest.fixture
@@ -174,7 +174,7 @@ def test_pusty_sygnal_nie_crashuje():
 
 def test_integracja_z_earthquake_core(tmp_path):
     """Loader -> TIMDR_EarthquakeCore powinno dzialac end-to-end bez bledow."""
-    from timdr_core_earthquake import TIMDR_EarthquakeCore
+    from core.timdr_core_earthquake import TIMDR_EarthquakeCore
 
     rng = np.random.default_rng(1)
     n = 200

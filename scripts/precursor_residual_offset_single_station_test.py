@@ -77,10 +77,12 @@ import argparse
 import json
 import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # repo root, dla "core.X"
 
 import numpy as np
 
-from timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
 from precursor_residual_offset_test import residual_window_feature, run_synthetic_selftest
 from precursor_ringdown_test import (
     WINDOW_HOURS,

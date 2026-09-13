@@ -171,7 +171,7 @@ from typing import List, Optional
 
 import numpy as np
 
-from timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
 
 MAD_TO_STD = 1.4826  # ta sama stala co Synoptyk-v3/membrane/defects.py
 ROBUST_K = 3.5        # ta sama wartosc co Synoptyk-v3 DEFECT_K, patrz zastrzezenie #3
@@ -184,7 +184,7 @@ ANOMALY_FACTOR = 3.5  # jw., przekazywane do core.anomalies()
 # samodzielnie po sklonowaniu WYLACZNIE siebie (decyzja na wyrazna
 # prosbe: "repozytoria kodu maja byc niezalezne od siebie"). Zachowanie/
 # matematyka bez zmian.
-from _vendor_timdr_meta_dynamics_core import MetaState, MetaOperatorM, MetaMap, MetaTrigger, MetaTriggerResult
+from core._vendor_timdr_meta_dynamics_core import MetaState, MetaOperatorM, MetaMap, MetaTrigger, MetaTriggerResult
 
 
 WINDOW_SECONDS = 5.0

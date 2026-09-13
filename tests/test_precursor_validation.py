@@ -21,8 +21,8 @@ import warnings
 import numpy as np
 import pytest
 
-import precursor_validation as pv
-from precursor_validation import (
+import core.precursor_validation as pv
+from core.precursor_validation import (
     PrecursorValidationWarning,
     get_ringdown_precursor_validation_status,
     load_real_ringdown_precursor_dataset,
@@ -31,7 +31,7 @@ from precursor_validation import (
     validate_against_catalog,
     warn_if_unvalidated,
 )
-from ringdown import ringdown_resonance
+from core.ringdown import ringdown_resonance
 
 
 @pytest.fixture(autouse=True)

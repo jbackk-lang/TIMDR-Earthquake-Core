@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from catalog_core import TIMDRCatalogFusion
+from core.catalog_core import TIMDRCatalogFusion
 from demo_usgs_catalog import load_snapshot
 
 

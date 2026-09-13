@@ -11,7 +11,7 @@ scałkowana prognoza jest stabilniejsza - to udokumentowane, nie ukryte.
 import numpy as np
 import pytest
 
-from omori_forecast import (
+from core.omori_forecast import (
     fit_omori_utsu,
     expected_count_omori,
     fit_gutenberg_richter_b,

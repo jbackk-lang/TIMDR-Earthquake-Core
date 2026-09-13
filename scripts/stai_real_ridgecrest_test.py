@@ -88,11 +88,23 @@ from __future__ import annotations
 import re
 import sys
 from datetime import datetime, timezone
+from pathlib import Path
 
 import numpy as np
 
-sys.path.insert(0, "/sessions/blissful-focused-lamport/mnt/TIMDR-Earthquake-Core")
-from timdr_core_earthquake import TIMDR_EarthquakeCore  # noqa: E402
+# POPRAWIONE przy reorganizacji repo (byla tu zahardkodowana, juz i tak
+# bledna sciezka absolutna z sandboksa jednej konkretnej sesji -
+# "/sessions/.../mnt/TIMDR-Earthquake-Core" bez "a/" w srodku - dzialajaca
+# wylacznie przypadkiem/wcale, nigdy przenosna na maszyne uzytkownika).
+# Wlasciwe repo root wzgledem tego pliku (teraz w scripts/):
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore  # noqa: E402
+
+# POPRAWIONE przy tej samej okazji: ponizej byly analogicznie zahardkodowane
+# sciezki "/sessions/.../mnt/outputs/ridgecrest_raw_*.txt" z jednej konkretnej
+# sesji sandboksowej - realne pliki katalogu Ridgecrest zyja w tym repo pod
+# data/ridgecrest_2019/ (te same, ktorych uzywa core/omori_forecast.py).
+DATA_DIR = str(Path(__file__).resolve().parent.parent / "data" / "ridgecrest_2019")
 
 FS = 20.0
 TAU = 3.0
@@ -171,11 +183,11 @@ def run_negative_control(duration_s, seed):
 
 def main():
     dense_events = load_events(
-        "/sessions/blissful-focused-lamport/mnt/outputs/ridgecrest_raw_dense.txt",
+        DATA_DIR + "/ridgecrest_raw_dense.txt",
         "2019-07-06T03:15:00Z",
     )
     isolated_events_all = load_events(
-        "/sessions/blissful-focused-lamport/mnt/outputs/ridgecrest_raw_isolated.txt",
+        DATA_DIR + "/ridgecrest_raw_isolated.txt",
         "2019-08-01T00:00:00Z",
     )
     # CALIBRATION NOTE #2 (disclosed): a run at cutoff M>=2.0 gave isolated
@@ -198,7 +210,7 @@ def main():
           "pure USGS catalog magnitudes) -- part of the STAI evidence in its\n"
           "own right:")
     dense_mags_raw = [m for (_, m) in load_events(
-        "/sessions/blissful-focused-lamport/mnt/outputs/ridgecrest_raw_dense.txt",
+        DATA_DIR + "/ridgecrest_raw_dense.txt",
         "2019-07-06T03:15:00Z")]
     iso_mags_all = [m for (_, m) in isolated_events_all]
     print(f"  DENSE window (queried M>=2.0):    n={len(dense_mags_raw)}  "

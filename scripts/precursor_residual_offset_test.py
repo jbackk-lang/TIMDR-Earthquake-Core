@@ -63,11 +63,13 @@ import argparse
 import json
 import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # repo root, dla "core.X"
 
 import numpy as np
 
-from residual_offset import residual_offset
-from timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.residual_offset import residual_offset
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
 
 # Reużyte WPROST (nie skopiowane) z precursor_ringdown_test.py - ten sam
 # katalog/stacje/progi fronts()/okna czasowe, żeby porównanie dwóch cech

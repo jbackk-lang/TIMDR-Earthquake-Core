@@ -18,22 +18,57 @@ pip install -e ".[dev]"     # + pytest, do uruchamiania testów
 
 ```bash
 # CLI - bez pisania kodu
-python cli.py obspy_BW_RJOB_example.csv --out raport.json
+python cli.py data/obspy_BW_RJOB_example.csv --out raport.json
 
 # jako biblioteka
 python -c "
-from seismic_loader import SeismicLoader
-from timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.seismic_loader import SeismicLoader
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
 
-t, s = SeismicLoader().load_csv('obspy_BW_RJOB_example.csv')
+t, s = SeismicLoader().load_csv('data/obspy_BW_RJOB_example.csv')
 core = TIMDR_EarthquakeCore()
 confirmed, rejected = core.hybrid_trigger(t, s, nsta=25, nlta=100)
 print(confirmed)
 "
 
 python gui_app.py            # interfejs graficzny (run.bat na Windows)
-pytest -q                    # 92 testy
+pytest -q                    # 144 testy
 ```
+
+## Struktura repozytorium
+
+```
+TIMDR-Earthquake-Core/
+├── cli.py                — punkt wejścia CLI (`timdr-earthquake`)
+├── gui_app.py             — punkt wejścia GUI (Tkinter)
+├── conftest.py            — pusty, wyłącznie żeby pytest poprawnie
+│                            dodawał katalog główny repo do sys.path
+├── core/                  — cały właściwy pakiet/biblioteka
+│   ├── timdr_core_earthquake.py    — STA/LTA, flow/twist/anomalies, hybrid_trigger
+│   ├── seismic_loader.py           — wczytywanie i czyszczenie CSV
+│   ├── catalog_core.py             — praca na katalogach zdarzeń (nie na waveformie)
+│   ├── ringdown.py                 — cecha "tłumiona oscylacja po zdarzeniu"
+│   ├── residual_offset.py          — cecha "trwały odcisk / brak powrotu do bazy"
+│   ├── omori_forecast.py           — prognoza tempa wstrząsów wtórnych (Omori-Utsu + GR)
+│   ├── meta_adapter.py             — most do TIMDR-META-DYNAMICS (Λ,τ,ρ,J)
+│   ├── topology_features.py        — cechy topologiczne (eksperymentalne)
+│   ├── seismic_trigger_module.py, precursor_validation.py, ...
+│   └── _vendor_timdr_*.py          — zwendorowane zależności z repo-sióstr
+├── tests/                 — cały pytest (144 testy), jeden plik na moduł core/
+├── scripts/                — samodzielne skrypty demo/eksploracyjne (nie testy)
+├── docs/                   — zrzuty ekranu, zapisane wyniki JSON/txt, archiwalne README
+├── data/                   — dane wejściowe (CSV/mseed) — duże pliki poza git
+├── synoptyk-analiza/       — ⚠️ patrz zastrzeżenie niżej, nie część tego projektu
+├── README.md
+└── HISTORIA_I_TESTY.md     — pełna chronologia audytu, błędów i wyników
+```
+
+> **Uwaga o `synoptyk-analiza/`**: ten katalog (raport + wykresy dot.
+> osobnego projektu pogodowego) trafił do repo przypadkowo w starym
+> commicie razem z `docs/gui_app.py.txt` i nie jest częścią
+> TIMDR-Earthquake-Core. Zostawiony bez zmian przy tej reorganizacji —
+> nie usunięty ani nie przeniesiony, żeby nic nie skasować po cichu.
+> Daj znać, czy usunąć, przenieść do osobnego repo, czy zostawić.
 
 ## Czym to jest w porównaniu z innymi narzędziami
 

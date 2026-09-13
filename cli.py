@@ -18,8 +18,8 @@ import sys
 
 import numpy as np
 
-from seismic_loader import SeismicLoader
-from timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.seismic_loader import SeismicLoader
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
 
 
 def analyze(t, s, nsta=25, nlta=100, sta_lta_thr_on=3.0, sta_lta_thr_off=1.0,

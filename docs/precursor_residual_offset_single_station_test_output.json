@@ -1,0 +1,20 @@
+{
+  "target_station": "CTAO",
+  "synthetic_selftest": {
+    "positive_control_p_value": 1.2865229890685133e-11,
+    "positive_control_detected_injected_signal": true,
+    "negative_control_p_value": 0.24533525608466622,
+    "negative_control_no_false_alarm": true,
+    "mean_frac_persistent_direct_with_signal": 0.6066666666666668,
+    "mean_frac_persistent_direct_background": 0.03777777777777778,
+    "discrimination_vs_decaying_oscillation_mean_persistence": 0.04,
+    "discrimination_ok": true,
+    "pipeline_verified": true,
+    "end_to_end_fronts_pipeline_diagnostic": {
+      "note": "Diagnostyka pomocnicza (nie bramkuje pipeline_verified): pelny fronts()+residual_offset na tle AR(1) z i bez wstrzknietego trwalego skoku. fronts() jest konserwatywny na tym tle (mala liczba niezerowych probek w obu grupach, patrz precursor_ringdown_test.py), wiec ten test ma mniejsza moc niz bezposrednia kalibracja klasyfikatora powyzej.",
+      "n_nonzero_samples_of_60": 2,
+      "mean_frac_persistent_with_signal": 0.06666666666666667,
+      "mean_frac_persistent_background": 0.0
+    }
+  }
+}

@@ -7,12 +7,15 @@ skali sejsmicznej (0.01-1 Hz, niższe fs) + test na PRAWDZIWYM zapisie
 w docstringu modułu.
 """
 import csv
+import os
 
 import numpy as np
 import pytest
 
-from ringdown import ringdown_resonance
-from timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.ringdown import ringdown_resonance
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
+
+_DATA_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "obspy_BW_RJOB_example.csv")
 
 
 def test_underdamped_recovers_known_frequency_and_damping_skala_sejsmiczna():
@@ -62,7 +65,7 @@ def test_monotonic_recovery_is_not_oscillatory():
 
 def _load_real_trace():
     t, s = [], []
-    with open("obspy_BW_RJOB_example.csv", newline="") as f:
+    with open(_DATA_CSV, newline="") as f:
         for row in csv.DictReader(f):
             t.append(float(row["t"]))
             s.append(float(row["s"]))

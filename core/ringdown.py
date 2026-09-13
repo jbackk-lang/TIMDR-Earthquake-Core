@@ -72,7 +72,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from precursor_validation import warn_if_unvalidated
+from core.precursor_validation import warn_if_unvalidated
 
 
 def ringdown_resonance(

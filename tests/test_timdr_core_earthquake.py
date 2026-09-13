@@ -1,6 +1,6 @@
 import numpy as np
 import pytest
-from timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
 
 
 @pytest.fixture

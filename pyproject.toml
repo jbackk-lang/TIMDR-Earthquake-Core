@@ -24,12 +24,8 @@ dev = ["pytest>=7.0"]
 timdr-earthquake = "cli:main"
 
 [tool.setuptools]
+packages = ["core"]
 py-modules = [
-    "timdr_core_earthquake",
-    "seismic_loader",
-    "catalog_core",
-    "ringdown",
-    "topology_features",
-    "precursor_validation",
     "cli",
+    "gui_app",
 ]

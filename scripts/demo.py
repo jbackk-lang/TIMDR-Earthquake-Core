@@ -1,6 +1,10 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # repo root, dla "core.X"
+
 import numpy as np
-from seismic_loader import SeismicLoader
-from timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.seismic_loader import SeismicLoader
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
 
 rng = np.random.default_rng(0)
 n = 300

@@ -37,7 +37,7 @@ gęstego roju, nie tylko odsetka wykryć.
 """
 import numpy as np
 import pytest
-from timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
 
 N = 20000
 NSTA, NLTA = 20, 200

@@ -28,10 +28,10 @@ matplotlib.use("TkAgg")
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
-from timdr_core_earthquake import TIMDR_EarthquakeCore
-from seismic_loader import SeismicLoader
-from meta_adapter import build_meta_series_from_waveform, WINDOW_SECONDS as META_WINDOW_SECONDS_DEFAULT
-from omori_forecast import (
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.seismic_loader import SeismicLoader
+from core.meta_adapter import build_meta_series_from_waveform, WINDOW_SECONDS as META_WINDOW_SECONDS_DEFAULT
+from core.omori_forecast import (
     fit_omori_utsu,
     fit_gutenberg_richter_b,
     forecast_probability,

@@ -14,16 +14,17 @@ import os
 import numpy as np
 import pytest
 
-from meta_adapter import (
+from core.meta_adapter import (
     WINDOW_SECONDS,
     build_meta_series_from_waveform,
     compute_global_thresholds,
     window_to_meta_state,
 )
-from timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REAL_CSV = os.path.join(HERE, "data", "ridgecrest_2019", "real_waveform_CLC_RIO", "CLC_HHZ.csv")
+REPO_ROOT = os.path.dirname(HERE)
+REAL_CSV = os.path.join(REPO_ROOT, "data", "ridgecrest_2019", "real_waveform_CLC_RIO", "CLC_HHZ.csv")
 
 
 def _synthetic_calm(duration=30.0, fs=100.0, seed=0):
@@ -78,7 +79,7 @@ def test_negative_control_two_identical_calm_windows_give_zero_M_and_stable_phas
     t1, s1 = t[:half], s[:half]
     t2, s2 = t[:half], s[:half]  # ta sama tablica - identyczne okno
 
-    from _vendor_timdr_meta_dynamics_core import MetaOperatorM
+    from core._vendor_timdr_meta_dynamics_core import MetaOperatorM
     op = MetaOperatorM()
     state1 = window_to_meta_state(core, t1, s1, thresholds)
     state2 = window_to_meta_state(core, t2, s2, thresholds)
@@ -93,7 +94,7 @@ def test_v1_scale_invariance_bug_documented_by_algebra():
     przyklad liczbowy (zasada z meta-regul ekosystemu TIMDR: kazde
     twierdzenie matematyczne podeprzec liczbowym przykladem przed
     publikacja)."""
-    from meta_adapter import _robust_threshold
+    from core.meta_adapter import _robust_threshold
 
     window_a = np.array([1.0, 1.0, 1.0, 10.0])
     window_b = window_a * 10.0  # ta sama "ksztalt", 10x wieksza skala
@@ -130,7 +131,7 @@ def test_mismatched_lengths_raise():
 @pytest.mark.skipif(not os.path.exists(REAL_CSV), reason="brak pliku z realnymi danymi CLC_HHZ.csv")
 def test_end_to_end_real_ridgecrest_waveform_runs_without_crashing():
     import warnings
-    from seismic_loader import SeismicLoader
+    from core.seismic_loader import SeismicLoader
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -183,7 +184,7 @@ def test_causal_calibration_end_variant_on_real_data_saturates_post_event():
     (dlugi coda/sekwencja wstrzasow wtornych), nie precyzyjnie
     powtarzalna stala."""
     import warnings
-    from seismic_loader import SeismicLoader
+    from core.seismic_loader import SeismicLoader
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -211,7 +212,7 @@ def test_rolling_calibration_variant_on_real_data_is_causal_and_discriminates():
     'krytyczna' w poblizu t~=60s) I WRACA do 'stabilna' po jego zaniku,
     zamiast zostac zablokowany w 'krytyczna' do konca zapisu."""
     import warnings
-    from seismic_loader import SeismicLoader
+    from core.seismic_loader import SeismicLoader
 
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")

@@ -25,9 +25,13 @@ Test: PERMUTACYJNY, nie tylko srednia. Porownujemy R(t) (i osobno samo
 Topology(t)) w oknie PRZED-startem vs w wielu losowych oknach z tla,
 zeby ocenic, czy roznica jest wieksza niz przypadkowa.
 """
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))  # repo root, dla "core.X"
+
 import numpy as np
-from timdr_core_earthquake import TIMDR_EarthquakeCore
-from topology_features import topology_series, zscore_causal
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.topology_features import topology_series, zscore_causal
 
 TOPOLOGY_WINDOW, TOPOLOGY_EMBED_DIM, TOPOLOGY_DELAY = 60, 3, 3
 PRE_WINDOW = 30  # ile probek "przed startem" liczymy jako okno przedwstrzasowe

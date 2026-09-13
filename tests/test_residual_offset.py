@@ -5,13 +5,16 @@ pasmem szumu sprzed zdarzenia). Zobacz residual_offset.py's docstring dla
 pełnego uzasadnienia i pre-rejestracji parametrów.
 """
 import csv
+import os
 
 import numpy as np
 import pytest
 
-from residual_offset import residual_offset
-from ringdown import ringdown_resonance
-from timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.residual_offset import residual_offset
+from core.ringdown import ringdown_resonance
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
+
+_DATA_CSV = os.path.join(os.path.dirname(__file__), "..", "data", "obspy_BW_RJOB_example.csv")
 
 
 def test_persistent_step_is_detected():
@@ -129,7 +132,7 @@ def test_raises_on_event_idx_out_of_range():
 
 def _load_real_trace():
     t, s = [], []
-    with open("obspy_BW_RJOB_example.csv", newline="") as f:
+    with open(_DATA_CSV, newline="") as f:
         for row in csv.DictReader(f):
             t.append(float(row["t"]))
             s.append(float(row["s"]))

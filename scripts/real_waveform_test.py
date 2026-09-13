@@ -19,11 +19,12 @@ PRE-REJESTRACJA (przed uruchomieniem):
 - Uruchomienie: RAZ, obie stacje, bez zmiany parametrow po zobaczeniu wyniku.
 """
 import sys
-import os; sys.path.insert(0, os.path.dirname(__file__))
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # repo root, dla "core.X" (skrypt jest teraz w scripts/)
 from obspy import read, UTCDateTime
 import numpy as np
-from timdr_core_earthquake import TIMDR_EarthquakeCore
-from ringdown import ringdown_resonance
+from core.timdr_core_earthquake import TIMDR_EarthquakeCore
+from core.ringdown import ringdown_resonance
 
 MAINSHOCK = UTCDateTime("2019-07-06T03:19:53.040")
 
