@@ -610,3 +610,79 @@ próbek, potem powrót do czystego szumu):
 Zero zmian w istniejących testach — nowa cecha żyje w osobnym pliku,
 importuje `ringdown_resonance()` tylko do jednego testu dyskryminacyjnego
 (porównanie na tym samym sygnale, nie modyfikacja).
+
+## `omori_forecast.py` — prognoza probabilistyczna wstrząsów wtórnych (Omori-Utsu + Gutenberg-Richter)
+
+**Pytanie użytkownika, wprost:** czy GUI ma coś w rodzaju czerwonego
+ostrzeżenia "będą kolejne wstrząsy" / zielonego "koniec sekwencji"?
+Odpowiedź w momencie pytania: nie, nigdzie w repo. To, co poniżej, jest
+odpowiedzią zbudowaną na jego prośbę — **ustaloną, operacyjną metodą
+sejsmologiczną** (Omori 1894/Utsu 1961 + MLE Ogaty 1983, Gutenberg-Richter
+1944 + MLE Akiego 1965, połączone metodą Reasenberg-Jones 1989 —
+dokładnie ta metoda stoi za operacyjnymi prognozami wstrząsów wtórnych
+USGS), **nie** nową matematyką TIMDR i **nie** prognozą głównego
+wstrząsu (ten problem pozostaje otwarty w sejsmologii — baner w
+`gui_app.py` się do niego odnosi, nie do tego modułu).
+
+**Testy syntetyczne** (`test_omori_forecast.py`, 39 testów): kontrola
+pozytywna (symulacja procesu Omori-Utsu/GR o znanych K,c,p,b — MLE musi
+zbiec i być w rozsądnej tolerancji), bramki min-N (fail-closed poniżej
+`MIN_EVENTS_FOR_FIT=20`), monotoniczność prognozy w czasie/magnitudzie,
+granice `[0,1]` dla prawdopodobieństwa.
+
+**Znaleziona własność statystyczna (PRZED dotknięciem realnych danych):**
+pojedyncze parametry (K,c,p) z MLE mogą być silnie niepewne nawet przy
+poprawnej zbieżności i setkach zdarzeń (dobrze udokumentowany w
+literaturze kompromis c-p) — w symulacji niektóre ziarna dały (K,c,p)
+2-7x odbiegające od prawdy, MIMO lepszego (nie gorszego) log-likelihood
+niż prawdziwe parametry. Scałkowana PROGNOZA (`expected_count_omori()`)
+była za to systematycznie stabilniejsza (0.3-1.1x prawdy) — dlatego
+moduł/panel GUI pokazuje prognozę, nie surowe K/c/p jako fakty.
+
+**Realny test na katalogu Ridgecrest 2019** (`test_omori_ridgecrest_real.py`,
+5 testów, dane lokalne, bez internetu — `data/ridgecrest_2019/*.txt`,
+prawdziwe czasy/magnitudy USGS):
+
+1. **Wynik negatywny, uczciwie zgłoszony**: dopasowanie do TYLKO
+   pierwszych 10 minut po wstrząsie M7.1 (42 zdarzenia M≥3.5) ląduje z
+   `p` na granicy dopuszczalnego zakresu (`fit_at_boundary=True`) i
+   przeszacowuje tempo kolejnej godziny ~6x (prognoza: 110 zdarzeń
+   M≥4.0, rzeczywiście: 17). **To bezpośrednia odpowiedź na "na ile
+   wcześniej ostrzegałoby": z samych pierwszych ~30 minut — NIE
+   wiarygodnie.**
+2. Dopasowanie do PEŁNEGO okna (146 zdarzeń, 73,5 min) nie ląduje na
+   granicy i daje b=1,08±0,09 — bardzo blisko uniwersalnej wartości
+   b≈1,0 z literatury sejsmologicznej (dobry znak wiarygodności przy
+   wystarczającej próbie).
+3. **Tempo chwilowe M≥4,0 pozostaje CZERWONE przez całe zaobserwowane
+   okno** (73,5 min) i jeszcze wiele godzin dalej w ekstrapolacji —
+   próg ŻÓŁTY osiągany dopiero w okolicy ~24h, ZIELONY dopiero rzędu
+   dni. **To potwierdza wprost intuicję użytkownika ("praktycznie
+   zielony nigdy") dla wstrząsu tej wielkości w krótkiej skali czasu.**
+4. **Niezależna kontrola pozytywna**: drugi, osobny plik realnych danych
+   (`ridgecrest_raw_isolated.txt`, 46 zdarzeń, ~26 dni po wstrząsie,
+   sekwencja rozproszona do tła) — ekstrapolacja dopasowania z pierwszych
+   73,5 minuty na +26 dni przewiduje oczekiwane 0,011 zdarzenia M≥4,0 w
+   24h; rzeczywiście zaobserwowano 0 (max magnituda w tym oknie: 3,17).
+   Jeden punkt walidacji poza próbą (n=1 sekwencja), nie systematyczny
+   backtest, ale uczciwy, pozytywny sygnał rzędu wielkości.
+
+**Panel GUI** (`gui_app.py`, przycisk "🌊 Aftershock forecast (Omori-Utsu)..."):
+osobne okno (Toplevel) operujące na katalogu (czas,magnituda), NIE na
+przebiegu falowym analizowanym w głównym oknie — powód: STA/LTA tego
+repo gubi 9-60% zdarzeń w gęstym roju (patrz `test_aftershock_swarm_detection.py`),
+dopasowanie Omoriego do niepełnego zbioru zaniżyłoby tempo. Domyślnie
+wskazuje bundlowany katalog Ridgecrest. Pokazuje status teraz +
+prognozę na +1h/+6h/+24h/+7d (z jawną flagą "EKSTRAPOLACJA" poza
+zaobserwowane dane) + P(≥1) w STAŁYCH oknach (nie rosnących w
+nieskończoność — patrz niżej dlaczego to ważne) + jawny disclaimer.
+
+**Dlaczego tempo chwilowe, nie P(≥1 zdarzenie), jest podstawą koloru:**
+P(≥1) w oknie o rosnącej długości dąży do 1 dla KAŻDEGO dodatniego
+tempa — na realnym katalogu P(≥1 M≥4 w kolejnych 73 min) wyszło 100%,
+cały czas, nawet gdy tempo już wyraźnie opadało. Dlatego poziom
+czerwony/żółty/zielony liczony jest z tempa chwilowego (malejącego
+monotonicznie), nie z tej nasycającej się probability.
+
+`pytest -q` — **144 testy przechodzą** (100 poprzednich + 39 w
+`test_omori_forecast.py` + 5 w `test_omori_ridgecrest_real.py`).

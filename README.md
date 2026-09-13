@@ -175,6 +175,13 @@ wykluczalność `calibration_end`/`rolling_history_seconds`).
   negatywny na realnych danych.
 - `anomalies()`/`fronts()` nie są projektowane pod strumień na żywo —
   analizują już zarejestrowany segment za jednym wywołaniem.
+- `omori_forecast.py` (panel GUI "🌊 Aftershock forecast") daje
+  probabilistyczną prognozę TEMPA wstrząsów wtórnych (Omori-Utsu +
+  Gutenberg-Richter, metoda USGS) — NIE prognozę głównego wstrząsu.
+  Dopasowanie do <30 minut danych po wstrząsie jest niewiarygodne
+  (potwierdzone na realnym katalogu Ridgecrest — przeszacowanie ~6x);
+  potrzeba więcej czasu obserwacji, zanim dopasowanie się ustabilizuje.
+  Patrz `HISTORIA_I_TESTY.md`.
 
   Dodatkowe zastrzeżenia ujawnione w audycie na realnym katalogu Ridgecrest 2019
 EV / jump detection — liczby błędne w pierwszej analizie, kierunek wniosku poprawny.  

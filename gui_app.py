@@ -31,6 +31,15 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolb
 from timdr_core_earthquake import TIMDR_EarthquakeCore
 from seismic_loader import SeismicLoader
 from meta_adapter import build_meta_series_from_waveform, WINDOW_SECONDS as META_WINDOW_SECONDS_DEFAULT
+from omori_forecast import (
+    fit_omori_utsu,
+    fit_gutenberg_richter_b,
+    forecast_probability,
+    current_risk_status,
+    MC_DEFAULT,
+    RISK_MAGNITUDE_DEFAULT,
+    MIN_EVENTS_FOR_FIT,
+)
 
 PHASE_COLORS = {"stabilna": "#43a047", "przejsciowa": "#fb8c00", "krytyczna": "#e53935"}
 
@@ -319,7 +328,9 @@ class TimdrEarthquakeGUI(tk.Tk):
         # (data/preprocessing/parameters/results) is below, in a
         # scrollable column.
         ttk.Button(parent, text="▶  Run analysis", style="Accent.TButton",
-                   command=self.on_analyze).pack(fill="x", pady=(0, 10))
+                   command=self.on_analyze).pack(fill="x", pady=(0, 4))
+        ttk.Button(parent, text="🌊  Aftershock forecast (Omori-Utsu)...",
+                   command=self.on_open_omori_forecast).pack(fill="x", pady=(0, 10))
 
         data_frame = ttk.Labelframe(parent, text="1. Input data", padding=8)
         data_frame.pack(fill="x", pady=(0, 8))
@@ -855,6 +866,185 @@ class TimdrEarthquakeGUI(tk.Tk):
         self.results_text.delete("1.0", "end")
         self.results_text.insert("1.0", "\n".join(lines))
         self.results_text.configure(state="disabled")
+
+    # ------------------------------------------------------------
+    # Aftershock forecast (Omori-Utsu) - ADDED 2026-09-13, separate
+    # dialog: operates on a CATALOG (time,magnitude pairs), not on the
+    # waveform trace this window otherwise analyzes - see
+    # omori_forecast.py's module docstring for why (STA/LTA on a
+    # synthetic waveform loses 9-60% of events during a dense swarm,
+    # patrz test_aftershock_swarm_detection.py; fitting Omori to an
+    # incomplete set would understate the true rate).
+    # ------------------------------------------------------------
+
+    def on_open_omori_forecast(self):
+        import os
+
+        win = tk.Toplevel(self)
+        win.title("Prognoza wstrząsów wtórnych (Omori-Utsu) — eksperymentalne")
+        win.geometry("760x640")
+        win.configure(background=self.COLORS["bg"])
+
+        warn = ttk.Frame(win)
+        warn.pack(fill="x", padx=14, pady=(12, 4))
+        ttk.Label(
+            warn,
+            text="Szacunek probabilistyczny tempa WSTRZĄSÓW WTÓRNYCH (ustalona metoda "
+                 "sejsmologiczna: Omori-Utsu + Gutenberg-Richter, Reasenberg-Jones 1989 - "
+                 "tak liczy USGS operacyjnie). NIE prognozuje GŁÓWNEGO wstrząsu (patrz baner "
+                 "na górze okna) i NIGDY nie daje pewności 'tak/nie będzie kolejny' - tylko "
+                 "prawdopodobieństwo/tempo, z zastrzeżeniami widocznymi niżej.",
+            foreground="#b71c1c", font=("Segoe UI", 8, "italic"), wraplength=720, justify="left",
+        ).pack(fill="x")
+
+        form = ttk.Labelframe(win, text="Katalog (czas, magnituda)", padding=8)
+        form.pack(fill="x", padx=14, pady=(8, 4))
+
+        default_catalog = os.path.join(os.path.dirname(__file__), "data", "ridgecrest_2019",
+                                        "ridgecrest_raw_dense.txt")
+        self.omori_catalog_path_var = tk.StringVar(value=default_catalog)
+        row1 = ttk.Frame(form)
+        row1.pack(fill="x")
+        ttk.Entry(row1, textvariable=self.omori_catalog_path_var).pack(side="left", fill="x", expand=True)
+        ttk.Button(row1, text="Przeglądaj...", command=self._browse_omori_catalog).pack(side="left", padx=(6, 0))
+        ttk.Label(form, text="Format pliku: jedna linia na zdarzenie, 'ISO_CZAS,MAGNITUDA' - "
+                              "domyślnie prawdziwy katalog Ridgecrest 2019 (283 realne zdarzenia, "
+                              "patrz demo_ridgecrest_real() dla proweniencji danych).",
+                  foreground="#607d8b", font=("Segoe UI", 8), wraplength=700, justify="left").pack(
+            fill="x", pady=(4, 0))
+
+        row2 = ttk.Frame(form)
+        row2.pack(fill="x", pady=(8, 0))
+        self.omori_mainshock_var = tk.StringVar(value="2019-07-06T03:19:53.040000+00:00")
+        ttk.Label(row2, text="Czas głównego wstrząsu (t=0, ISO):", width=30).pack(side="left")
+        ttk.Entry(row2, textvariable=self.omori_mainshock_var, width=30).pack(side="left")
+
+        row3 = ttk.Frame(form)
+        row3.pack(fill="x", pady=(6, 0))
+        self.omori_mc_var = tk.DoubleVar(value=MC_DEFAULT)
+        self.omori_risk_mag_var = tk.DoubleVar(value=RISK_MAGNITUDE_DEFAULT)
+        ttk.Label(row3, text="Magnituda zupełności katalogu Mc:", width=30).pack(side="left")
+        ttk.Entry(row3, textvariable=self.omori_mc_var, width=8).pack(side="left")
+        ttk.Label(row3, text="  Magnituda ryzyka:", width=16).pack(side="left")
+        ttk.Entry(row3, textvariable=self.omori_risk_mag_var, width=8).pack(side="left")
+
+        ttk.Button(form, text="Dopasuj i prognozuj", style="Accent.TButton",
+                   command=lambda: self._run_omori_forecast(out)).pack(fill="x", pady=(8, 0))
+
+        out = tk.Text(win, height=24, wrap="word", font=("Consolas", 9))
+        out.pack(fill="both", expand=True, padx=14, pady=(8, 12))
+        out.configure(state="disabled")
+
+    def _browse_omori_catalog(self):
+        path = filedialog.askopenfilename(
+            title="Wybierz katalog (czas,magnituda)",
+            filetypes=[("Text/CSV", "*.txt *.csv"), ("Wszystkie pliki", "*.*")],
+        )
+        if path:
+            self.omori_catalog_path_var.set(path)
+
+    def _run_omori_forecast(self, out_widget: tk.Text):
+        from datetime import datetime
+
+        def write(text):
+            out_widget.configure(state="normal")
+            out_widget.delete("1.0", "end")
+            out_widget.insert("1.0", text)
+            out_widget.configure(state="disabled")
+
+        try:
+            path = self.omori_catalog_path_var.get().strip()
+            mainshock_t0 = datetime.fromisoformat(self.omori_mainshock_var.get().strip())
+            mc = float(self.omori_mc_var.get())
+            m_risk = float(self.omori_risk_mag_var.get())
+
+            events = []
+            with open(path) as f:
+                for line in f:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    ts, mag = line.split(",")
+                    t = datetime.fromisoformat(ts.strip().replace("Z", "+00:00"))
+                    events.append((t, float(mag)))
+            events.sort()
+            after = [(t, m) for t, m in events if t > mainshock_t0]
+            if len(after) < MIN_EVENTS_FOR_FIT:
+                write(f"Za mało zdarzeń PO czasie t=0 w tym pliku ({len(after)}) - "
+                      f"potrzeba >= {MIN_EVENTS_FOR_FIT}. Sprawdź czas głównego wstrząsu.")
+                return
+
+            rel_s = np.array([(t - mainshock_t0).total_seconds() for t, m in after])
+            mags = np.array([m for t, m in after])
+            T_obs = float(rel_s.max())
+
+            sel = mags >= mc
+            omori_fit = fit_omori_utsu(rel_s[sel], T_obs)
+            gr_fit = fit_gutenberg_richter_b(mags, mc)
+
+            lines = []
+            lines.append(f"Katalog: {path}")
+            lines.append(f"Zdarzeń po t=0: {len(after)}  |  Mc={mc}  |  T_obs={T_obs/60:.1f} min "
+                          f"({T_obs/3600:.2f} h)")
+            lines.append("")
+
+            if omori_fit.insufficient_data or gr_fit.insufficient_data:
+                lines.append(f"NIEWYSTARCZAJĄCE DANE do dopasowania (potrzeba >= {MIN_EVENTS_FOR_FIT} "
+                              f"zdarzeń M>=Mc, jest: {omori_fit.n_events} Omori / {gr_fit.n_events} GR).")
+                lines.append("Fail-closed: nie pokazuję żadnej prognozy zamiast niepewnej liczby.")
+                write("\n".join(lines))
+                return
+
+            lines.append(f"Dopasowanie Omori-Utsu (MLE, n={omori_fit.n_events}): "
+                         f"K={omori_fit.K:.4g}  c={omori_fit.c_s:.1f}s  p={omori_fit.p:.3f}")
+            if omori_fit.fit_at_boundary:
+                lines.append("  !! p wylądowało na granicy dopuszczalnego zakresu - dopasowanie "
+                              "NIEWIARYGODNE (zbyt krótkie/rzadkie okno obserwacji). Nie ufaj poniższej "
+                              "ekstrapolacji - patrz omori_forecast.py's docstring.")
+            lines.append(f"Gutenberg-Richter (MLE Akiego, n={gr_fit.n_events}): "
+                         f"b={gr_fit.b:.3f} ± {gr_fit.b_stderr:.3f}")
+            lines.append("")
+
+            status_now = current_risk_status(omori_fit, gr_fit, T_obs, m_target=m_risk)
+            tier_pl = {"czerwony": "CZERWONY (aktywna sekwencja)",
+                       "zolty": "ŻÓŁTY (nadal podwyższone, opada)",
+                       "zielony": "ZIELONY (tempo Omoriego poniżej progu - NIE znaczy zero ryzyka)"}
+            lines.append(f"STATUS TERAZ (na koniec katalogu, t={T_obs/60:.1f} min): "
+                         f"{tier_pl[status_now.tier]}")
+            lines.append(f"  tempo chwilowe M>={m_risk}: {status_now.rate_per_hour:.4f} zdarzeń/h")
+            lines.append("")
+
+            lines.append(f"Prognoza tempa/poziomu w kolejnych horyzontach (M>={m_risk}):")
+            for label, t_future_s in [
+                ("+1 godzina", T_obs + 3600),
+                ("+6 godzin", T_obs + 6 * 3600),
+                ("+24 godziny", T_obs + 24 * 3600),
+                ("+7 dni", T_obs + 7 * 86400),
+            ]:
+                st = current_risk_status(omori_fit, gr_fit, t_future_s, m_target=m_risk)
+                extrap = "  [EKSTRAPOLACJA poza zaobserwowane dane - mniej pewne]" if st.is_extrapolated_beyond_observation else ""
+                lines.append(f"  {label:>12}: {tier_pl[st.tier].split(' (')[0]:>10}  "
+                             f"(tempo={st.rate_per_hour:.4f}/h){extrap}")
+
+            lines.append("")
+            lines.append("Prawdopodobieństwo >=1 zdarzenia w STAŁYCH oknach od teraz (nie rośnie do 100% "
+                         "w nieskończoność, bo okno jest ograniczone):")
+            for label, horizon_s in [("następna godzina", 3600), ("następne 24h", 86400)]:
+                res = forecast_probability(omori_fit, gr_fit, T_obs, T_obs + horizon_s, m_risk)
+                lines.append(f"  P(>=1, M>={m_risk}, {label}) = {res.probability_at_least_one*100:.1f}%  "
+                             f"(oczekiwana liczba: {res.expected_count:.3f})")
+
+            lines.append("")
+            lines.append("Pamiętaj: 'ZIELONY' oznacza tylko, że dopasowane tempo Omoriego spadło "
+                         "poniżej progu - prawo Omoriego nie modeluje powrotu do regionalnego tła "
+                         "sejsmicznego, więc to NIE jest twierdzenie 'sekwencja się skończyła'. "
+                         "Ekstrapolacja daleko poza zaobserwowane okno jest z natury mniej pewna "
+                         "(patrz flaga [EKSTRAPOLACJA] wyżej i omori_forecast.py's docstring o "
+                         "niestabilności dopasowania na krótkich oknach).")
+
+            write("\n".join(lines))
+        except Exception as e:
+            write(f"BŁĄD: {type(e).__name__}: {e}\n\n{traceback.format_exc()}")
 
 
 def _enable_windows_dpi_awareness():
